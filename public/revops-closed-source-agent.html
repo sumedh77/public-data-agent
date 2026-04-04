@@ -441,7 +441,7 @@ Continuously scanning <strong style="color:var(--text);margin:0 2px">324 account
 <button class="ca-dl-btn" onclick="dlCSV()"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="10" height="10"><path d="M4 13h8M8 3v7M5 7l3 3 3-3"/></svg>Export to CRM</button>
 </div>
 <div class="ca-tbl-scroll" id="caTblScroll" style="display:none">
-<table class="ca-tbl"><thead><tr><th>Account</th><th>Signals</th><th>Score</th><th>Key insight</th><th>Best contact</th><th>Outreach angle</th><th>Sources</th><th>Proof</th></tr></thead><tbody id="caTbody"></tbody></table>
+<table class="ca-tbl"><thead><tr><th>Account</th><th>Signals</th><th>Score</th><th>Key insight</th><th>Best contact</th><th>Outreach angle</th><th>Sources</th></tr></thead><tbody id="caTbody"></tbody></table>
 </div>
 <div class="ca-sanity" id="caSanity" style="display:none"></div>
 </div>
@@ -744,14 +744,6 @@ document.getElementById('ppTitle').textContent='Trigger events & market signals'
 document.getElementById('ppSub').textContent='Select a suggestion or type your query to scan the public web';
 document.querySelector('.pp-icon').textContent='🌐';
 
-// Update pipeline phase bar labels for public agent
-document.getElementById('ph-seed').querySelector('.ph-ico')||document.getElementById('ph-seed');
-const phaseLabels=[['ph-seed','Parse'],['ph-filter','Search'],['ph-trigger','Scrape'],['ph-score','Extract'],['ph-enrich','Synthesize']];
-phaseLabels.forEach(([id,lbl])=>{
-  const el=document.getElementById(id);
-  if(el){const txt=el.lastChild;if(txt&&txt.nodeType===3)txt.textContent=' '+lbl;}
-});
-
 const stepsEl=document.getElementById('ppSteps');
 stepsEl.innerHTML=PUBLIC_AGENT.pipelineSteps.map((s,j)=>{
 const colors=['pp-s1','pp-s2','pp-s3','pp-s4','pp-s5'];
@@ -801,7 +793,6 @@ const av=document.querySelector('#caIntro .ca-avatar');
 av.style.background='var(--ac-bg)';av.style.borderColor='var(--ac-border)';av.style.color='var(--accent)';av.textContent='R';
 document.querySelector('.pp-icon').textContent='⚡';
 renderSuggs();
-_restorePhaseLabels();
 }
 
 let caRunning=false;
@@ -810,13 +801,7 @@ let currentPlaybookType=null;
 let currentSignalType=null;
 let isPublicAgent=false;
 
-function _restorePhaseLabels(){
-const labels=[['ph-seed','Seed'],['ph-filter','Intent'],['ph-trigger','Trigger'],['ph-score','Score'],['ph-enrich','Enrich']];
-labels.forEach(([id,lbl])=>{const el=document.getElementById(id);if(el){const txt=el.lastChild;if(txt&&txt.nodeType===3)txt.textContent=' '+lbl;}});
-}
-
 const PHASE_MAP={seed:'seed',intent:'filter',trigger:'trigger',score:'score',enrich:'enrich'};
-const PUBLIC_PHASE_MAP={query_generation:'seed',search:'filter',scraping:'trigger',extraction:'score',synthesis:'enrich'};
 
 function parseICPFromPills(){
 const tech=[],verts=[];let eng=50,stage='series-b+';
@@ -877,41 +862,20 @@ if(line.startsWith('event: ')){evt=line.slice(7).trim();}
 else if(line.startsWith('data: ')&&evt){
 try{
 const d=JSON.parse(line.slice(6));
-if(evt==='start'){if(d.msg){setLog(d.msg);updateThinking('caThink',d.msg);}}
-else if(evt==='phase'){
-const ph=PUBLIC_PHASE_MAP[d.phase]||d.phase;
-setPhase(ph,d.status);
-if(d.msg){setLog(d.msg);updateThinking('caThink',d.msg);}
-}
-else if(evt==='done'){
+if(evt==='phase'||evt==='start'){if(d.msg){setLog(d.msg);updateThinking('caThink',d.msg);}}
+else if(evt==='answer'){
 removeEl('caThink');
 const companies=d.companies||[];
-lastResults=companies.slice(0,25).map((c,i)=>{
-const ev=c.evidence?.[0]||{};
-return{
-name:c.company_name||c.company_domain?.split('.')[0]?.replace(/-/g,' ')||'Unknown',
-dom:c.company_domain||'',
-sigs:['tech_shop'],
-score:Math.max(20,Math.round(85-(i*2.5))),
-insight:(ev.key_excerpt||ev.summary||'Detected from public signals.').slice(0,200),
-contact:'—',ctitle:ev.content_type||'Blog/News',cstart:(ev.date||'').slice(0,10)||'Recent',
-angle:`Evidence: ${esc((ev.title||ev.url||'').slice(0,120))}`,
-sources:[(ev.content_type||'News signal'),'Exa/Parallel AI'],
-sourceUrl:ev.url||'',
-sourceTitle:ev.title||ev.url||'',
-sourceDate:(ev.date||'').slice(0,10)||'',
-allEvidence:c.evidence||[]
-};
-});
-if(lastResults.length){
-renderResults(lastResults,query);
+lastResults=companies.slice(0,25).map((c,i)=>({
+name:c.name||c.domain?.split('.')[0]||'Unknown',dom:c.domain||'',sigs:['tech_shop'],
+score:Math.max(20,85-i*3),insight:c.summary||(c.evidence?.[0]?.excerpt)||'Detected from public signals.',
+contact:'Engineering Lead',ctitle:'Head of Engineering',cstart:'Active role',
+angle:'Signal detected from public web intelligence.',sources:['Dev activity']
+}));
+if(lastResults.length)renderResults(lastResults,query);
 const elapsed=((Date.now()-t0)/1000).toFixed(1);
-document.getElementById('caElapsed').textContent=elapsed+'s';
-document.getElementById('caElapsed').style.display='inline';
-addAgentBubble(`<div class="ca-aname" style="color:#059669">Public intelligence agent</div><p>Found <strong>${lastResults.length} companies</strong> from ${d.total_articles||0} public sources in ${elapsed}s.</p><p style="margin-top:5px;font-size:11px;color:var(--muted)">Sources: Exa · Parallel AI · Firecrawl — ${d.pipeline_stats?.urls_discovered||0} URLs scanned.</p>`);
-}else{
-addAgentBubble(`<div class="ca-aname">Public intelligence agent</div><p>Search completed but no matching companies found — try rephrasing your query.</p>`);
-}
+document.getElementById('caElapsed').textContent=elapsed+'s';document.getElementById('caElapsed').style.display='inline';
+addAgentBubble(`<div class="ca-aname" style="color:#059669">Public intelligence agent</div><p>Found <strong>${lastResults.length} accounts</strong> in ${elapsed}s from public signals.</p>`);
 }
 }catch(e){}
 evt='';
@@ -986,38 +950,28 @@ const SRC_MAP={'Stack detection':'src-tech','Hiring intent':'src-job','Leadershi
 
 function renderTable(data){
 const tb=document.getElementById('caTbody');tb.innerHTML='';
-if(!data.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--faint)">No results match this filter.</td></tr>';document.getElementById('caTblScroll').style.display='block';return}
+if(!data.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--faint)">No results match this filter.</td></tr>';document.getElementById('caTblScroll').style.display='block';return}
 data.forEach(r=>{
 const tr=document.createElement('tr');
 const scCls=r.score>=80?'sc-hi':r.score>=70?'sc-md':'sc-lo';
 const sigs=r.sigs.map(s=>{const[l,c]=SIG_MAP[s]||[s,'sig-tech'];return`<span class="sig-badge ${c}">${esc(l)}</span>`}).join('');
 const srcs=r.sources.map(s=>`<span class="src-badge ${SRC_MAP[s]||'src-tech'}">${esc(s)}</span>`).join(' ');
-const ini=r.contact.replace(/—/g,'?').split(' ').map(w=>w[0]||'?').join('');
-const proofLinks=(r.allEvidence||[]).slice(0,3).map(ev=>{
-if(!ev.url)return '';
-const label=ev.title?ev.title.slice(0,40)+(ev.title.length>40?'…':''):(new URL(ev.url).hostname);
-const badge=ev.content_type||'article';
-return `<a href="${ev.url}" target="_blank" rel="noopener" style="display:flex;align-items:flex-start;gap:5px;text-decoration:none;margin-bottom:5px;" title="${esc(ev.title||ev.url)}">
-<span style="font-family:var(--mono);font-size:8px;padding:2px 5px;border-radius:3px;background:#f0fdf4;color:#059669;border:1px solid #86efac;white-space:nowrap;flex-shrink:0">${esc(badge)}</span>
-<span style="font-size:10px;color:var(--accent);line-height:1.3;word-break:break-all">${esc(label)}</span>
-</a>`;
-}).filter(Boolean).join('')||(r.sourceUrl?`<a href="${r.sourceUrl}" target="_blank" rel="noopener" style="font-size:10px;color:var(--accent)" title="${esc(r.sourceTitle)}">${esc((r.sourceTitle||r.sourceUrl).slice(0,50))}…</a>`:'<span style="color:var(--faint);font-size:10px">—</span>');
+const ini=r.contact.split(' ').map(w=>w[0]).join('');
 tr.innerHTML=`<td><div class="co-wrap"><img src="https://www.google.com/s2/favicons?domain=${r.dom}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-fav"><div><div class="co-name">${esc(r.name)}</div><div class="co-dom">${esc(r.dom)}</div></div></div></td>
 <td><div style="display:flex;flex-wrap:wrap;gap:2px;max-width:160px">${sigs}</div></td>
 <td><span class="sc-pill ${scCls}">${r.score}</span></td>
 <td><div style="font-size:10.5px;color:var(--muted);line-height:1.5;max-width:200px">${esc(r.insight)}</div></td>
-<td><div class="person-card"><div class="person-av">${esc(ini[0]||'?')}</div><div class="person-info"><div class="person-name">${esc(r.contact)}</div><div class="person-title">${esc(r.ctitle)}<br><span style="color:var(--accent)">${esc(r.cstart)}</span></div></div></div></td>
+<td><div class="person-card"><div class="person-av">${ini}</div><div class="person-info"><div class="person-name">${esc(r.contact)}</div><div class="person-title">${esc(r.ctitle)}<br><span style="color:var(--accent)">${esc(r.cstart)}</span></div></div></div></td>
 <td><div class="angle-txt">${esc(r.angle)}</div></td>
-<td><div style="display:flex;flex-direction:column;gap:3px">${srcs}</div></td>
-<td><div style="max-width:200px">${proofLinks}</div></td>`;
+<td><div style="display:flex;flex-direction:column;gap:3px">${srcs}</div></td>`;
 tb.appendChild(tr);
 });
 document.getElementById('caTblScroll').style.display='block';
 }
 
 function dlCSV(){
-const hdrs=['Account','Domain','Score','Signals','Insight','Contact','Title','Outreach Angle','Sources','Proof URL'];
-const rows=lastResults.map(r=>[r.name,r.dom,r.score,r.sigs.join('; '),r.insight,r.contact,r.ctitle,r.angle,r.sources.join('; '),r.sourceUrl||'']);
+const hdrs=['Account','Domain','Score','Signals','Insight','Contact','Title','Outreach Angle','Sources'];
+const rows=lastResults.map(r=>[r.name,r.dom,r.score,r.sigs.join('; '),r.insight,r.contact,r.ctitle,r.angle,r.sources.join('; ')]);
 const csv=[hdrs,...rows].map(row=>row.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
 const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
 a.download=`reo-revops-${new Date().toISOString().slice(0,10)}.csv`;

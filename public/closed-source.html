@@ -818,7 +818,7 @@ return{tech_stack:tech.length?tech:['kubernetes','terraform','go'],min_engineers
 async function runClosedSourceQuery(query,t0){
 const icp=parseICPFromPills();
 try{
-const resp=await fetch('http://localhost:4000/api/closed-source',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query,icp,playbook_type:currentPlaybookType,signal_type:currentSignalType})});
+const resp=await fetch('/api/closed-source',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query,icp,playbook_type:currentPlaybookType,signal_type:currentSignalType})});
 if(!resp.ok)throw new Error('HTTP '+resp.status);
 const reader=resp.body.getReader();const decoder=new TextDecoder();
 let buf='';let evt='';
@@ -849,7 +849,7 @@ if(!lastResults.length){removeEl('caThink');addAgentBubble(`<div class="ca-aname
 
 async function runPublicAgentQuery(query,t0){
 try{
-const resp=await fetch('http://localhost:4000/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:query})});
+const resp=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:query})});
 if(!resp.ok)throw new Error('HTTP '+resp.status);
 const reader=resp.body.getReader();const decoder=new TextDecoder();
 let buf='';let evt='';
