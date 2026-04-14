@@ -322,7 +322,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
         <div class="fr-title"><span id="resCnt">Results</span></div>
         <button class="fr-dl" id="dlBtn" onclick="dl()" disabled><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="10" height="10"><path d="M4 13h8M8 3v7M5 7l3 3 3-3"/></svg>Download CSV</button>
       </div>
-      <div class="tsc" id="tsc" style="display:none"><table class="tbl"><thead><tr><th>Company</th><th>Domain</th><th>Source</th><th>Type</th><th>Signal</th><th>Score</th><th>Published</th><th>Proof</th><th>Next Step</th></tr></thead><tbody id="tb"></tbody></table><div class="pg" id="pgB"><span style="font-family:var(--mono);font-size:9px;color:var(--tm);letter-spacing:.06em">SHOW</span><div style="display:flex;gap:4px"><button class="pg-p active" onclick="sps(10,this)">10</button><button class="pg-p" onclick="sps(25,this)">25</button><button class="pg-p" onclick="sps(0,this)">All</button></div><span id="pgS" style="font-family:var(--mono);font-size:9px;color:var(--tm);margin-left:4px"></span></div></div>
+      <div class="tsc" id="tsc" style="display:none"><table class="tbl"><thead><tr><th>Company</th><th>Domain</th><th>Source</th><th>Type</th><th>Signal</th><th>Score</th><th>Published</th><th>GitHub</th><th>Proof</th><th>Next Step</th></tr></thead><tbody id="tb"></tbody></table><div class="pg" id="pgB"><span style="font-family:var(--mono);font-size:9px;color:var(--tm);letter-spacing:.06em">SHOW</span><div style="display:flex;gap:4px"><button class="pg-p active" onclick="sps(10,this)">10</button><button class="pg-p" onclick="sps(25,this)">25</button><button class="pg-p" onclick="sps(0,this)">All</button></div><span id="pgS" style="font-family:var(--mono);font-size:9px;color:var(--tm);margin-left:4px"></span></div></div>
       <div class="san" id="san"></div>
     </div>
 
@@ -477,6 +477,9 @@ async function runQ(q){
                 el.textContent=`${data.elapsed}s`;
                 el.style.display='inline';
             }
+            // Auto-trigger GitHub check for all discovered domains
+            const domains = [...new Set((data.companies||[]).map(c=>c.company_domain).filter(Boolean))];
+            if(domains.length > 0) checkGithubDomains(domains);
           }
         }
       }
@@ -504,7 +507,7 @@ function evC(r,sub){
   const{dt,rc,rl,v}=r.di;const ex=(r.ke||r.title||'').slice(0,sub?100:140);const u=r.url||'',ud=u.replace(/^https?:\/\/(www\.)?/,'').slice(0,34);const ns=r.nsd||domOf(u);const n=nxS(r);
   let dc=v&&dt?`<div class="dt-m">${esc(dt)}</div><span class="dt-r ${rc}">${esc(rl)}</span>`:`<span style="font-family:var(--mono);font-size:8px;color:#c2410c">⚠ unverified</span>`;
   const sd=sub?`<td style="padding-left:8px;border-left:2px solid var(--border)"><span style="font-family:var(--mono);font-size:9px;color:var(--tm)">${esc(ns)}</span></td>`:`<td><div class="co-w"><img src="https://www.google.com/s2/favicons?domain=${ns}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-f"/><div class="co-n" style="color:var(--ts);font-size:10.5px">${esc(ns)}</div></div></td>`;
-  return`${sd}<td><span class="ct-b ${ctC}">${esc(ctL)}</span></td><td><div class="sig-t">${esc(ex)}</div></td><td><span class="sc-p ${scC}">${Math.round(sc*100)}%</span></td><td>${dc}</td><td><a href="${esc(u)}" target="_blank" onclick="event.stopPropagation()" class="pu" title="${esc(u)}" style="text-decoration:none;">${esc(ud)}${ud.length>=34?'…':''}</a></td><td><span class="ns-p ${n.c}">${n.i} ${esc(n.a)}</span></td>`}
+  return`${sd}<td><span class="ct-b ${ctC}">${esc(ctL)}</span></td><td><div class="sig-t">${esc(ex)}</div></td><td><span class="sc-p ${scC}">${Math.round(sc*100)}%</span></td><td>${dc}</td><td id="gh-${sub?'s':'m'}-${(r.cd||domOf(r.url||'')).replace(/\./g,'-')}"><span style="font-family:var(--mono);font-size:9px;color:var(--tm)">…</span></td><td><a href="${esc(u)}" target="_blank" onclick="event.stopPropagation()" class="pu" title="${esc(u)}" style="text-decoration:none;">${esc(ud)}${ud.length>=34?'…':''}</a></td><td><span class="ns-p ${n.c}">${n.i} ${esc(n.a)}</span></td>`}
 
 function renT(rows){
   const tb=document.getElementById('tb');tb.innerHTML='';
@@ -524,6 +527,37 @@ function renRes(data){aR=[];fD=[];for(const co of(data.companies||[]))for(const 
 function dl(){if(!fD.length)return;const h=['Company','Domain','Title','Type','Signal','Score','Date','URL'];const r=fD.map(x=>[x.cn,x.cd,x.title,x.ct,(x.ke||'').replace(/[\n\r]+/g,' '),Math.round(x.conf*100)+'%',x.date,x.url]);const c=[h,...r].map(x=>x.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));a.download=`open-signals-${new Date().toISOString().slice(0,10)}.csv`;document.body.appendChild(a);a.click();document.body.removeChild(a)}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function domOf(u){const m=(u||'').match(/https?:\/\/(?:www\.)?([^/]+)/);return m?m[1].toLowerCase():''}
+
+// ── GitHub presence checker ───────────────────────────────────────────────────
+async function checkGithubDomains(domains) {
+  try {
+    const resp = await fetch('/api/check-github', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({domains}),
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    for (const r of (data.results || [])) {
+      const safeId = (r.domain || '').replace(/\./g, '-');
+      // Update both main row cell (gh-m-...) and sub-row cell (gh-s-...)
+      for (const prefix of ['m', 's']) {
+        const cell = document.getElementById(`gh-${prefix}-${safeId}`);
+        if (!cell) continue;
+        if (r.has_github) {
+          const ghUrl = r.github_url || `https://github.com`;
+          cell.innerHTML = `<a href="${esc(ghUrl)}" target="_blank" style="text-decoration:none;font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:4px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;display:inline-flex;align-items:center;gap:3px;">
+            <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            Yes</a>`;
+        } else {
+          cell.innerHTML = `<span style="font-family:var(--mono);font-size:9px;color:var(--tm);">No</span>`;
+        }
+      }
+    }
+  } catch(e) {
+    console.warn('GitHub check failed:', e);
+  }
+}
 
 renS();renH();
 // setTimeout(()=>{openAgent();setTimeout(()=>runQ(HIST[0].q),200)},400);

@@ -2060,6 +2060,68 @@ async def test_sec_endpoint(body: SecTestRequest):
         results = await search_sec_edgar(client, [body.query], body.forms, body.max_days)
         return {"results": results}
 
+# ── GitHub presence checker ───────────────────────────────────────────────────
+GITHUB_RE     = re.compile(r'github\.com/[a-zA-Z0-9_\-]', re.IGNORECASE)
+GITHUB_URL_RE = re.compile(r'https?://github\.com/[a-zA-Z0-9_\-/]+', re.IGNORECASE)
+
+class GithubCheckRequest(BaseModel):
+    domains: list[str]
+
+async def _check_one_domain(client: httpx.AsyncClient, domain: str) -> dict:
+    """Scrape a domain homepage and detect GitHub presence."""
+    url = f"https://{domain}"
+    try:
+        r = await client.post(
+            f"{FIRECRAWL_URL}/scrape",
+            headers={"Authorization": f"Bearer {FIRECRAWL_KEY}", "Content-Type": "application/json"},
+            json={
+                "url": url,
+                "formats": ["markdown", "links"],
+                "onlyMainContent": False,
+            },
+            timeout=25,
+        )
+        data = r.json()
+        if not data.get("success"):
+            return {"domain": domain, "has_github": False, "github_url": None, "error": "scrape_failed"}
+
+        content  = data.get("data", {})
+        markdown = content.get("markdown", "")
+        links    = content.get("links", [])
+
+        github_links = [l for l in links if "github.com/" in l.lower()
+                        and not any(x in l.lower() for x in ["github.com/login", "github.com/signup"])]
+
+        text_hit = bool(GITHUB_RE.search(markdown))
+
+        github_url = None
+        if github_links:
+            github_url = github_links[0]
+        else:
+            m = GITHUB_URL_RE.search(markdown)
+            if m:
+                github_url = m.group(0)
+
+        return {
+            "domain":     domain,
+            "has_github": bool(github_links or text_hit),
+            "github_url": github_url,
+        }
+    except Exception as e:
+        return {"domain": domain, "has_github": False, "github_url": None, "error": str(e)}
+
+@app.post("/api/check-github")
+async def check_github_endpoint(body: GithubCheckRequest):
+    """Check up to 30 domains in parallel for GitHub presence on their homepage."""
+    domains = list(dict.fromkeys(body.domains))[:30]  # dedupe + cap at 30
+    limits  = httpx.Limits(max_connections=10, max_keepalive_connections=5)
+    async with httpx.AsyncClient(verify=False, limits=limits) as client:
+        results = await asyncio.gather(*[
+            _check_one_domain(client, d) for d in domains
+        ])
+    return {"results": list(results)}
+
+
 @app.get("/api/dashboard-stats")
 async def dashboard_stats():
     try:
