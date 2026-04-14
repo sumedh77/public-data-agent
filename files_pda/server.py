@@ -1044,6 +1044,9 @@ Snippets to analyze:
         json_match = re.search(r'\{.*\}', raw_text.replace('\n', ''), re.DOTALL)
         res = json.loads(json_match.group(0)) if json_match else json.loads(raw_text)
         return {item["url"]: item for item in res.get("extractions", [])}, ai_cost
+    except httpx.HTTPStatusError as e:
+        print(f"Subject Entity Extraction HTTP failed: {e.response.text}")
+        return {}, 0.0
     except Exception as e:
         print("Subject Entity Extraction failed via AI:", e)
         return {}, 0.0
@@ -1115,9 +1118,12 @@ INSTRUCTIONS:
         out_tokens = usage.get("output_tokens", 0)
         cost = (in_tokens / 1_000_000) * COST_SONNET_IN_PER_1M + (out_tokens / 1_000_000) * COST_SONNET_OUT_PER_1M
         return answer, cost
+    except httpx.HTTPStatusError as e:
+        print(f"Synthesis HTTP failed: {e.response.text}")
+        return f"API Error: {e.response.status_code} - {e.response.text}", 0.0
     except Exception as e:
         print(f"Synthesis failed: {e}")
-        return "An error occurred while synthesizing the final report.", 0.0
+        return f"An error occurred while synthesizing: {str(e)}", 0.0
 
 # ── Main pipeline ─────────────────────────────────────────────────────────────
 def _infer_max_days(question: str) -> int:
@@ -1206,6 +1212,11 @@ Return ONLY a valid JSON object matching this exact structure:
             r_dict["sec_api"] = True
 
         return r_dict, res.get("corrected_query", question), res.get("search_queries", []), cost
+    except httpx.HTTPStatusError as e:
+        print(f"LLM routing HTTP failed: {e.response.text}")
+        q_lower = question.lower()
+        use_sec_fallback = any(kw in q_lower for kw in ["sec", "10-k", "10-q", "8-k", "earnings", "s-1"])
+        return {"exa": True, "parallel_ai": True, "sec_api": use_sec_fallback}, question, [], 0.0
     except Exception as e:
         print("LLM routing failed. Defaulting to regex queries.", e)
         # Force SEC to true if keywords present even on fallback
