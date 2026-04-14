@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEC-API Sandbox Tester</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-color: #f8fafc;
+            --surface: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.5;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 0.5rem;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-main);
+            font-size: 0.95rem;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .helper-text {
+            display: block;
+            margin-top: 0.35rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--primary);
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.15s ease-in-out;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .quick-prompts {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .pill {
+            background-color: #e0e7ff;
+            color: #3730a3;
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+
+        .pill:hover {
+            background-color: #c7d2fe;
+        }
+
+        /* Results section */
+        #results {
+            display: none;
+            margin-top: 2rem;
+        }
+
+        .result-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            transition: box-shadow 0.2s ease;
+        }
+
+        .result-card:hover {
+            box-shadow: var(--shadow-sm);
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .result-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .result-title:hover {
+            text-decoration: underline;
+        }
+
+        .result-meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            align-items: center;
+        }
+
+        .tag {
+            background-color: #f1f5f9;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 500;
+            color: #475569;
+        }
+
+        .result-snippet {
+            font-size: 0.95rem;
+            color: #334155;
+            line-height: 1.6;
+        }
+
+        .loader {
+            display: none;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-muted);
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            border: 1px dashed var(--border);
+        }
+        
+        .json-dump {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            font-family: inherit;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            margin-top: 1rem;
+            display: none;
+        }
+        
+        .toggle-json {
+            font-size: 0.85rem;
+            color: var(--primary);
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            width: auto;
+            display: inline-block;
+        }
+        .toggle-json:hover {
+            background: none;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>SEC-API Sandbox Tester</h1>
+        <p class="subtitle">Directly query the SEC-API full-text search infrastructure</p>
+    </header>
+
+    <div class="card">
+        <form id="searchForm">
+            <div class="form-group">
+                <label for="query">Search Query</label>
+                <input type="text" id="query" placeholder='e.g. "artificial intelligence" OR "machine learning"' required>
+                <span class="helper-text">Supports exact matches (""), boolean operators (OR, NOT), and wildcards (*)</span>
+                
+                <div class="quick-prompts">
+                    <span class="pill" onclick="setQuery('\"substantial doubt\"')">substantial doubt</span>
+                    <span class="pill" onclick="setQuery('\"material weakness\"')">material weakness</span>
+                    <span class="pill" onclick="setQuery('OpenAI OR Anthropic')">AI Companies</span>
+                    <span class="pill" onclick="setQuery('\"cybersecurity incident\" OR breach')">Cybersecurity</span>
+                    <span class="pill" onclick="setQuery('\"layoffs\" OR \"reduction in force\"')">Layoffs</span>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="forms">Form Types</label>
+                    <input type="text" id="forms" value="8-K,10-K,10-Q,S-1">
+                    <span class="helper-text">Comma-separated (e.g., 8-K, 10-K)</span>
+                </div>
+                <div class="form-group">
+                    <label for="maxDays">Time Range (Days)</label>
+                    <input type="number" id="maxDays" value="365" min="1" max="3650">
+                    <span class="helper-text">Look back period from today</span>
+                </div>
+            </div>
+
+            <button type="submit" id="submitBtn">Search SEC Filings</button>
+        </form>
+    </div>
+
+    <div class="loader" id="loader"></div>
+
+    <div id="results">
+        <h3 style="margin-bottom: 1rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem;">
+            Results <span id="resultCount" style="color: var(--text-muted); font-weight: normal; font-size: 0.9rem;"></span>
+        </h3>
+        <div id="resultsContainer"></div>
+    </div>
+</div>
+
+<script>
+    function setQuery(text) {
+        document.getElementById('query').value = text;
+    }
+
+    document.getElementById('searchForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const query = document.getElementById('query').value;
+        const forms = document.getElementById('forms').value;
+        const maxDays = parseInt(document.getElementById('maxDays').value, 10);
+        
+        const btn = document.getElementById('submitBtn');
+        const loader = document.getElementById('loader');
+        const resultsDiv = document.getElementById('results');
+        const container = document.getElementById('resultsContainer');
+        const countSpan = document.getElementById('resultCount');
+        
+        btn.disabled = true;
+        btn.textContent = 'Searching...';
+        loader.style.display = 'block';
+        resultsDiv.style.display = 'none';
+        
+        try {
+            const response = await fetch('/api/test-sec', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    query,
+                    forms,
+                    max_days: maxDays
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            const items = data.results || [];
+            
+            container.innerHTML = '';
+            countSpan.textContent = `(${items.length} items found)`;
+            
+            if (items.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg style="width: 48px; height: 48px; margin-bottom: 1rem; color: #cbd5e1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <h3>No results found</h3>
+                        <p style="margin-top: 0.5rem;">Try adjusting your search criteria or extending the date range.</p>
+                    </div>
+                `;
+            } else {
+                items.forEach((item, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'result-card';
+                    card.innerHTML = `
+                        <div class="result-header">
+                            <div>
+                                <a href="${item.url}" target="_blank" class="result-title">${item.title}</a>
+                                <div style="margin-top: 0.25rem; font-size: 0.9rem; color: #475569;">
+                                    ${item.company_name} <span style="opacity: 0.5">·</span> 
+                                    <span class="tag">CIK: ${item._sec_cik || 'N/A'}</span>
+                                </div>
+                            </div>
+                            <div class="result-meta">
+                                <span class="tag">${item._sec_form}</span>
+                                <span>${item.date}</span>
+                            </div>
+                        </div>
+                        <div class="result-snippet">
+                            ${item.snippet.replace(/\|/g, '<span style="color: #cbd5e1; margin: 0 0.5rem">|</span>')}
+                        </div>
+                        
+                        <button class="toggle-json" onclick="document.getElementById('raw-${index}').style.display = document.getElementById('raw-${index}').style.display === 'block' ? 'none' : 'block'">Show Raw Payload</button>
+                        <pre class="json-dump" id="raw-${index}">${JSON.stringify(item, null, 2)}</pre>
+                    `;
+                    container.appendChild(card);
+                });
+            }
+            
+            resultsDiv.style.display = 'block';
+            
+        } catch (error) {
+            container.innerHTML = `
+                <div class="empty-state" style="border-color: #f87171; background: #fef2f2; color: #991b1b;">
+                    <h3>Request Failed</h3>
+                    <p style="margin-top: 0.5rem;">${error.message}</p>
+                </div>
+            `;
+            resultsDiv.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Search SEC Filings';
+            loader.style.display = 'none';
+        }
+    });
+</script>
+
+</body>
+</html>

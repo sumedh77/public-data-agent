@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Monitoring Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f111a;
+            --surface: #1a1d2e;
+            --surface-2: #242839;
+            --border: #2e324a;
+            --text: #e2e8f0;
+            --text-muted: #8892b0;
+            --accent: #7c3aed;
+            --accent-glow: rgba(124,58,237,0.2);
+            --green: #10b981;
+            --blue: #3b82f6;
+            --orange: #f59e0b;
+            --pink: #ec4899;
+            --teal: #06b6d4;
+            --red: #ef4444;
+            --radius: 12px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--surface), var(--surface-2));
+            border-bottom: 1px solid var(--border);
+            padding: 1.25rem 2rem;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .header h1 {
+            font-size: 1.4rem; font-weight: 700;
+            background: linear-gradient(135deg, #7c3aed, #3b82f6);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .live-badge { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--green); }
+        .live-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); } 50% { box-shadow: 0 0 0 6px transparent; } }
+        .back-link { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .back-link:hover { color: var(--text); }
+
+        .container { max-width: 1300px; margin: 0 auto; padding: 1.75rem 2rem; }
+
+        /* Stat cards */
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 1.1rem 1.4rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .card:hover { border-color: var(--accent); box-shadow: 0 0 18px var(--accent-glow); }
+        .card .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.4rem; }
+        .card .val { font-size: 1.85rem; font-weight: 700; }
+        .card .sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem; }
+        .green .val { color: var(--green); }
+        .blue  .val { color: var(--blue); }
+        .orange .val { color: var(--orange); }
+        .pink  .val { color: var(--pink); }
+        .teal  .val { color: var(--teal); }
+
+        /* Two col */
+        .two-col { display: grid; grid-template-columns: 1fr 1.6fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+        @media(max-width:860px){ .two-col{ grid-template-columns:1fr; } }
+
+        /* Panel */
+        .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.4rem; }
+        .panel-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 1.1rem; display: flex; align-items: center; gap: 0.4rem; }
+
+        /* Tool cost stacked bar */
+        .cost-stack { display: flex; flex-direction: column; gap: 0.9rem; }
+        .cost-row { }
+        .cost-row-label { display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 0.3rem; }
+        .cost-row-label .name { font-weight: 500; }
+        .cost-row-label .amt  { color: var(--text-muted); font-family: monospace; }
+        .bar-track { height: 9px; background: var(--surface-2); border-radius: 5px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 5px; transition: width 0.6s ease; }
+        .bar-fill.exa { background: linear-gradient(90deg,#3b82f6,#60a5fa); }
+        .bar-fill.pai { background: linear-gradient(90deg,#7c3aed,#a78bfa); }
+        .bar-fill.sec { background: linear-gradient(90deg,#f59e0b,#fbbf24); }
+        .bar-fill.fc  { background: linear-gradient(90deg,#ef4444,#f87171); }
+        .bar-fill.llm { background: linear-gradient(90deg,#10b981,#34d399); }
+
+        /* Domains panel */
+        .domains-panel { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .domains-count { font-size: 4rem; font-weight: 800; color: var(--teal); line-height: 1; }
+        .domains-label { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.4rem; }
+        .domains-avg  { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.7rem; padding: 0.35rem 0.85rem; background: var(--surface-2); border-radius: 20px; display: inline-block; }
+
+        /* Table */
+        .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+        .table-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.4rem; border-bottom: 1px solid var(--border); }
+        .table-header h3 { font-size: 0.95rem; font-weight: 600; }
+        .refresh-btn { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); font-size: 0.78rem; padding: 0.35rem 0.8rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .refresh-btn:hover { border-color: var(--accent); color: var(--text); }
+
+        table { width: 100%; border-collapse: collapse; }
+        thead th { text-align: left; padding: 0.65rem 1rem; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); background: var(--surface-2); border-bottom: 1px solid var(--border); }
+        tbody td { padding: 0.7rem 1rem; font-size: 0.83rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: var(--surface-2); }
+
+        .query-text { max-width: 310px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+        .tool-pill { display: inline-block; font-size: 0.68rem; padding: 2px 7px; border-radius: 9999px; margin-right: 3px; font-weight: 500; }
+        .tool-pill.exa { background: rgba(59,130,246,0.15); color: var(--blue); }
+        .tool-pill.pai { background: rgba(124,58,237,0.15); color: #a78bfa; }
+        .tool-pill.sec { background: rgba(245,158,11,0.15); color: var(--orange); }
+        .tool-pill.off { background: var(--surface-2); color: #444; text-decoration: line-through; opacity: 0.5; }
+        .cost-cell { font-family: monospace; font-size: 0.79rem; }
+        .cost-cell.hi { color: var(--red); }
+        .cost-cell.md { color: var(--orange); }
+        .cost-cell.lo { color: var(--green); }
+        .ts-cell { color: var(--text-muted); font-size: 0.78rem; white-space: nowrap; }
+        .domains-cell { text-align: center; color: var(--teal); font-weight: 600; }
+
+        .empty-state { text-align: center; padding: 2.5rem; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div style="display:flex;align-items:center;gap:1.5rem">
+        <a href="/" class="back-link">← Back to Agent</a>
+        <h1>Monitoring Dashboard</h1>
+    </div>
+    <div class="live-badge">
+        <span class="live-dot"></span>
+        Auto-refreshing · 10s
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- ── Stat Cards ── -->
+    <div class="cards">
+        <div class="card green">
+            <div class="label">Total Queries</div>
+            <div class="val" id="totalQueries">—</div>
+            <div class="sub">Today: <span id="todayQueries">—</span></div>
+        </div>
+        <div class="card teal">
+            <div class="label">Distinct Domains Found</div>
+            <div class="val" id="totalDomains">—</div>
+            <div class="sub">Unique company domains surfaced</div>
+        </div>
+        <div class="card orange">
+            <div class="label">Total Spend</div>
+            <div class="val" id="totalSpend">—</div>
+            <div class="sub">Today: <span id="todaySpend">—</span></div>
+        </div>
+        <div class="card blue">
+            <div class="label">LLM Routing Cost</div>
+            <div class="val" id="llmCost">—</div>
+            <div class="sub">Claude Sonnet router</div>
+        </div>
+        <div class="card pink">
+            <div class="label">Avg Domains / Query</div>
+            <div class="val" id="avgDomains">—</div>
+            <div class="sub">Efficiency metric</div>
+        </div>
+    </div>
+
+    <!-- ── Two Col: Domains highlight + Per-tool cost bars ── -->
+    <div class="two-col">
+        <div class="panel domains-panel">
+            <div class="panel-title" style="justify-content:center">🌐 Distinct Company Domains</div>
+            <div class="domains-count" id="domainsCount">—</div>
+            <div class="domains-label">unique company domains found across all queries</div>
+            <div class="domains-avg" id="domainsAvg">avg — per query</div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">💸 Cost Breakdown by Tool</div>
+            <div class="cost-stack">
+                <div class="cost-row">
+                    <div class="cost-row-label"><span class="name">⚡ Exa Search</span><span class="amt" id="exaAmt">$0.0000</span></div>
+                    <div class="bar-track"><div class="bar-fill exa" id="exaBar" style="width:0%"></div></div>
+                </div>
+                <div class="cost-row">
+                    <div class="cost-row-label"><span class="name">🔵 Parallel AI</span><span class="amt" id="paiAmt">$0.0000</span></div>
+                    <div class="bar-track"><div class="bar-fill pai" id="paiBar" style="width:0%"></div></div>
+                </div>
+                <div class="cost-row">
+                    <div class="cost-row-label"><span class="name">🏛 SEC API</span><span class="amt" id="secAmt">$0.0000</span></div>
+                    <div class="bar-track"><div class="bar-fill sec" id="secBar" style="width:0%"></div></div>
+                </div>
+                <div class="cost-row">
+                    <div class="cost-row-label">
+                        <span class="name">🔥 Firecrawl Scraping <span id="fcPagesLabel" style="font-size:0.72rem;color:var(--text-muted)"></span></span>
+                        <span class="amt" id="fcAmt">$0.0000</span>
+                    </div>
+                    <div class="bar-track"><div class="bar-fill fc" id="fcBar" style="width:0%"></div></div>
+                </div>
+                <div class="cost-row">
+                    <div class="cost-row-label"><span class="name">🔵 PAI Extract (Firecrawl fallback)</span><span class="amt" id="paiExtractAmt">$0.0000</span></div>
+                    <div class="bar-track"><div class="bar-fill pai" id="paiExtractBar" style="width:0%"></div></div>
+                </div>
+                <div class="cost-row">
+                    <div class="cost-row-label"><span class="name">🧠 LLM — Routing + Entity AI (Claude Haiku)</span><span class="amt" id="llmBarAmt">$0.0000</span></div>
+                    <div class="bar-track"><div class="bar-fill llm" id="llmBar" style="width:0%"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Recent Queries Table ── -->
+    <div class="table-wrap">
+        <div class="table-header">
+            <h3>📋 Recent Queries (last 50)</h3>
+            <button class="refresh-btn" onclick="loadAll()">↻ Refresh Now</button>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Query</th>
+                    <th>Tools Routed</th>
+                    <th>FC Pages</th>
+                    <th>Domains Found</th>
+                    <th>LLM</th>
+                    <th>Exa</th>
+                    <th>PAI</th>
+                    <th>SEC</th>
+                    <th>FC</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody id="logBody">
+                <tr><td colspan="11" class="empty-state">No queries logged yet. Run a query on the main agent.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+function $(id){ return document.getElementById(id); }
+function fmt(v){ return '$'+(+v||0).toFixed(4); }
+function cc(v){ return v>=0.05?'hi':v>=0.015?'md':'lo'; }
+
+async function loadStats() {
+    try {
+        const d = await fetch('/api/dashboard-stats').then(r=>r.json());
+        if (d.error){ console.error(d.error); return; }
+
+        $('totalQueries').textContent  = d.total_queries;
+        $('todayQueries').textContent  = d.today_queries;
+        $('totalDomains').textContent  = d.total_distinct_domains ?? '—';
+        $('totalSpend').textContent    = fmt(d.total_spend);
+        $('todaySpend').textContent    = fmt(d.today_spend);
+        $('llmCost').textContent       = fmt(d.total_llm_cost);
+        const avg = d.total_queries > 0 ? (d.total_distinct_domains / d.total_queries).toFixed(1) : '—';
+        $('avgDomains').textContent    = avg;
+        $('domainsCount').textContent  = d.total_distinct_domains ?? '—';
+        $('domainsAvg').textContent    = `avg ${avg} per query`;
+
+        const tc = d.tool_costs || {};
+        const costs = [tc.exa||0, tc.pai||0, tc.sec||0, tc.fc||0, tc.pai_extract||0, tc.llm||0];
+        const maxCost = Math.max(...costs, 0.0001);
+
+        $('exaAmt').textContent        = fmt(tc.exa);
+        $('paiAmt').textContent        = fmt(tc.pai);
+        $('secAmt').textContent        = fmt(tc.sec);
+        $('fcAmt').textContent         = fmt(tc.fc);
+        $('paiExtractAmt').textContent = fmt(tc.pai_extract);
+        $('llmBarAmt').textContent     = fmt(tc.llm);
+
+        // Show FC pages count next to bar
+        const fcPages = d.total_fc_pages_scraped || 0;
+        $('fcPagesLabel').textContent = fcPages > 0 ? `(${fcPages} pages)` : '(0 — key may be expired)';
+
+        $('exaBar').style.width        = ((tc.exa||0)/maxCost*100)+'%';
+        $('paiBar').style.width        = ((tc.pai||0)/maxCost*100)+'%';
+        $('secBar').style.width        = ((tc.sec||0)/maxCost*100)+'%';
+        $('fcBar').style.width         = ((tc.fc||0)/maxCost*100)+'%';
+        $('paiExtractBar').style.width = ((tc.pai_extract||0)/maxCost*100)+'%';
+        $('llmBar').style.width        = ((tc.llm||0)/maxCost*100)+'%';
+
+    } catch(e){ console.error('Stats error:', e); }
+}
+
+async function loadLogs() {
+    try {
+        const d = await fetch('/api/dashboard-logs').then(r=>r.json());
+        if (d.error){ console.error(d.error); return; }
+        const body = $('logBody');
+        if (!d.logs || !d.logs.length){
+            body.innerHTML = '<tr><td colspan="11" class="empty-state">No queries logged yet.</td></tr>';
+            return;
+        }
+        body.innerHTML = d.logs.map(log => {
+            let tools = {};
+            try{ tools = JSON.parse(log.tools_used||'{}'); } catch{}
+            const llm = log.llm_cost || 0;
+            const exa = log.exa_cost || 0;
+            const pai = log.pai_cost || 0;
+            const sec = log.sec_cost || 0;
+            const fc  = log.fc_cost  || 0;
+            const tot = log.total_cost || 0;
+            const domains  = log.distinct_domains ?? '—';
+            const fcPages  = log.fc_pages_scraped ?? 0;
+            const fcBroken = fcPages === 0;
+            const toolPills = [
+                `<span class="tool-pill ${tools.exa?'exa':'off'}">${tools.exa?'⚡ Exa':'Exa'}</span>`,
+                `<span class="tool-pill ${tools.parallel_ai?'pai':'off'}">${tools.parallel_ai?'🔵 PAI':'PAI'}</span>`,
+                `<span class="tool-pill ${tools.sec_api?'sec':'off'}">${tools.sec_api?'🏛 SEC':'SEC'}</span>`,
+                `<span class="tool-pill ${fc>0?'fc':'off'}" title="${fcBroken?'Firecrawl returned 0 pages':'FC active'}">${fc>0?'🔥 FC':'FC ⚠️'}</span>`,
+            ].join('');
+            return `<tr>
+                <td class="ts-cell">${(log.timestamp||'').replace('T',' ').slice(0,19)}</td>
+                <td class="query-text" title="${(log.query||'').replace(/"/g,'&quot;')}">${log.query||'—'}</td>
+                <td>${toolPills}</td>
+                <td class="domains-cell" style="color:${fcBroken?'var(--red)':'var(--teal)'}">${fcPages}</td>
+                <td class="domains-cell">${domains}</td>
+                <td class="cost-cell ${cc(llm)}">${fmt(llm)}</td>
+                <td class="cost-cell ${cc(exa)}">${fmt(exa)}</td>
+                <td class="cost-cell ${cc(pai)}">${fmt(pai)}</td>
+                <td class="cost-cell ${cc(sec)}">${fmt(sec)}</td>
+                <td class="cost-cell ${cc(fc)}">${fmt(fc)}</td>
+                <td class="cost-cell ${cc(tot)}"><strong>${fmt(tot)}</strong></td>
+            </tr>`;
+        }).join('');
+    } catch(e){ console.error('Logs error:', e); }
+}
+
+function loadAll(){ loadStats(); loadLogs(); }
+loadAll();
+setInterval(loadAll, 10000);
+</script>
+</body>
+</html>

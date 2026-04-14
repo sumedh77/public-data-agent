@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Public Intelligence Agent — Architecture</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#020617;color:#e2e8f0;font-family:'IBM Plex Mono','Fira Code',monospace;min-height:100vh;padding:32px 20px}
+  .wrap{max-width:620px;margin:0 auto}
+
+  /* header */
+  .hdr{display:flex;align-items:center;gap:10px;margin-bottom:24px}
+  .dot{width:9px;height:9px;border-radius:50%;background:#3b82f6;box-shadow:0 0 10px #3b82f6;flex-shrink:0}
+  .hdr-text{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#94a3b8}
+  .hdr-sub{font-size:10px;color:#334155;margin-top:2px}
+
+  /* root node */
+  .root{background:#0f172a;border:1px solid #3b82f6;border-radius:14px;padding:16px 20px;text-align:center;box-shadow:0 0 28px #3b82f620;margin-bottom:4px}
+  .root-title{font-size:14px;font-weight:700;color:#f8fafc}
+  .root-sub{font-size:10px;color:#64748b;margin-top:4px;font-style:italic}
+  .root-endpoint{font-size:9px;color:#3b82f6;margin-top:6px}
+
+  /* connector */
+  .conn{display:flex;flex-direction:column;align-items:center;gap:0;margin:2px 0}
+  .conn-line{width:1px;height:18px;background:#1e293b}
+  .conn-arrow{color:#334155;font-size:8px;margin-top:-2px}
+
+  /* phase */
+  .phase{margin-bottom:4px}
+  .phase-hdr{background:#111827;border-radius:12px;padding:12px 16px;cursor:pointer;border:1px solid transparent;transition:border-color .15s;user-select:none}
+  .phase-hdr:hover{border-color:rgba(100,116,139,.4)}
+  .phase-hdr.open{border-radius:12px 12px 0 0;border-bottom:none}
+  .phase-title{font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .phase-sub{font-size:10px;color:#64748b;margin-top:3px}
+  .phase-toggle{font-size:10px;color:#475569;flex-shrink:0;margin-top:2px}
+  .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+  .tag{font-size:9px;padding:2px 7px;border-radius:4px;border:1px solid #334155;background:#1e293b;color:#64748b;font-family:inherit}
+  .tag.new{background:#78350f;color:#fbbf24;border-color:#b45309}
+
+  /* children */
+  .phase-children{background:#0c1a2e;border:1px solid #1e293b;border-top:none;border-radius:0 0 12px 12px;overflow:hidden;display:none}
+  .phase-children.open{display:block}
+  .child{padding:10px 16px;border-bottom:1px solid #1e293b;display:flex;flex-direction:column;gap:2px}
+  .child:last-child{border-bottom:none}
+  .child-title{font-size:11px;font-weight:600}
+  .child-sub{font-size:10px;color:#475569;line-height:1.5}
+  .child-tags{margin-top:4px}
+
+  /* output */
+  .output{background:#0f172a;border:1px solid rgba(16,185,129,.35);border-radius:14px;padding:16px 20px;margin-top:4px}
+  .output-title{font-size:12px;font-weight:700;color:#10b981;margin-bottom:12px}
+  .output-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .output-field{background:#020617;border:1px solid #1e293b;border-radius:8px;padding:9px 11px}
+  .output-key{font-size:9px;font-weight:700;color:#10b981;margin-bottom:2px}
+  .output-val{font-size:9px;color:#475569;line-height:1.4}
+
+  /* legend */
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:20px;padding-top:16px;border-top:1px solid #1e293b;font-size:9px;color:#475569}
+  .leg-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hdr">
+    <div class="dot"></div>
+    <div>
+      <div class="hdr-text">Public Intelligence Agent</div>
+      <div class="hdr-sub">Query execution architecture · click phases to expand/collapse</div>
+    </div>
+  </div>
+
+  <!-- Root -->
+  <div class="root">
+    <div class="root-title">💬 User Question</div>
+    <div class="root-sub">"Series A agentic AI companies with recent blogs in last 6 months"</div>
+    <div class="root-endpoint">POST /api/ask → SSE stream → browser</div>
+  </div>
+
+  <div class="conn"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+  <!-- Phase 1 -->
+  <div class="phase">
+    <div class="phase-hdr open" onclick="toggle(this)" style="border-color:rgba(125,211,252,.25)">
+      <div class="phase-title">
+        <span style="color:#7dd3fc">① Query Generation</span>
+        <span class="phase-toggle">▲</span>
+      </div>
+      <div class="phase-sub">No external API — pure keyword heuristics · runs locally</div>
+      <div class="tags">
+        <span class="tag">local</span><span class="tag">fast &lt;1ms</span>
+      </div>
+    </div>
+    <div class="phase-children open">
+      <div class="child">
+        <div class="child-title" style="color:#93c5fd">Keyword extraction</div>
+        <div class="child-sub">Strip stop-words from question, keep meaningful terms → _extract_keywords()</div>
+      </div>
+      <div class="child">
+        <div class="child-title" style="color:#93c5fd">5 query variants</div>
+        <div class="child-sub">Exact · "company blog post" · "engineering blog 2025" · "startup announcement" · "guide tutorial playbook"</div>
+        <div class="child-tags"><span class="tag">derive_search_queries()</span></div>
+      </div>
+      <div class="child">
+        <div class="child-title" style="color:#93c5fd">Date window inferred</div>
+        <div class="child-sub">"last 6 months" → max_days = 180 · "last year" → 365 · "last week" → 7</div>
+        <div class="child-tags"><span class="tag">_infer_max_days()</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="conn"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+  <!-- Phase 2 -->
+  <div class="phase">
+    <div class="phase-hdr open" onclick="toggle(this)" style="border-color:rgba(134,239,172,.25)">
+      <div class="phase-title">
+        <span style="color:#86efac">② Search</span>
+        <span class="phase-toggle">▲</span>
+      </div>
+      <div class="phase-sub">Parallel AI + Exa run simultaneously via asyncio.gather</div>
+      <div class="tags">
+        <span class="tag">parallel</span><span class="tag">dedup by URL</span><span class="tag">media domains excluded</span>
+      </div>
+    </div>
+    <div class="phase-children open">
+      <div class="child">
+        <div class="child-title" style="color:#86efac">🔵 Parallel AI Search</div>
+        <div class="child-sub">/v1beta/search · mode=fast · 5 queries in parallel · returns URLs + excerpts</div>
+      </div>
+      <div class="child">
+        <div class="child-title" style="color:#86efac">⚡ Exa Search</div>
+        <div class="child-sub">/search · 15 results/query · highlights=500 chars · publishedDate returned</div>
+      </div>
+      <div class="child">
+        <div class="child-title" style="color:#86efac">Merge + Sort</div>
+        <div class="child-sub">Union by URL · company pages float above media domains (_MEDIA_DOMAINS blocklist) · up to ~150 URLs total</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="conn"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+  <!-- Phase 3 -->
+  <div class="phase">
+    <div class="phase-hdr open" onclick="toggle(this)" style="border-color:rgba(253,164,175,.25)">
+      <div class="phase-title">
+        <span style="color:#fda4af">③ Scrape</span>
+        <span class="phase-toggle">▲</span>
+      </div>
+      <div class="phase-sub">Top 40 URLs · 8 concurrent (semaphore) · 20s timeout each</div>
+      <div class="tags">
+        <span class="tag">🔥 Firecrawl primary</span><span class="tag">🔵 fallback</span>
+      </div>
+    </div>
+    <div class="phase-children open">
+      <div class="child">
+        <div class="child-title" style="color:#fda4af">🔥 Firecrawl /scrape</div>
+        <div class="child-sub">Returns clean markdown · navigation noise removed · capped at 4000 chars/page</div>
+      </div>
+      <div class="child">
+        <div class="child-title" style="color:#fda4af">🔵 Parallel AI Extract (fallback)</div>
+        <div class="child-sub">/v1beta/extract · kicks in on any Firecrawl 4xx/5xx · same content cap</div>
+      </div>
+      <div class="child">
+        <div class="child-title" style="color:#fda4af">Snippet fallback</div>
+        <div class="child-sub">For URLs not successfully scraped: use the search-result snippet (400 chars) as lightweight evidence</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="conn"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+  <!-- Phase 4 -->
+  <div class="phase">
+    <div class="phase-hdr open" onclick="toggle(this)" style="border-color:rgba(252,211,77,.25)">
+      <div class="phase-title">
+        <span style="color:#fcd34d">④ Evidence Extraction + Sanity Check</span>
+        <span class="phase-toggle">▲</span>
+      </div>
+      <div class="phase-sub">Text-only · runs in thread pool · no external LLM</div>
+      <div class="tags">
+        <span class="tag">run_in_executor</span><span class="tag">keyword overlap scoring</span>
+      </div>
+    </div>
+    <div class="phase-children open">
+      <div class="child">
+        <div class="child-title" style="color:#fcd34d">Paragraph scoring</div>
+        <div class="child-sub">Split content → score each paragraph by keyword overlap with question → best excerpt returned · min overlap = 2 to pass</div>
+      </div>
+      <div class="child">
+        <div class="child-title" style="color:#fcd34d">Date resolution (2-tier)</div>
+        <div class="child-sub">Tier 1: extracted from page content via regex · Tier 2: publishedDate from search API (Exa/Parallel AI) as hint fallback</div>
+        <div class="child-tags"><span class="tag">_extract_date_from_content()</span></div>
+      </div>
+      <div class="child">
+        <div class="child-title" style="color:#fcd34d">Content type detection</div>
+        <div class="child-sub">URL pattern matching: /blog/ /press/ /whitepaper/ /guide/ → blog post · announcement · guide · whitepaper · article</div>
+      </div>
+      <div class="child" style="background:#1a1000;border-left:3px solid #f59e0b">
+        <div class="child-title" style="color:#f59e0b">🛡 Sanity Evaluator <span style="background:#78350f;color:#fbbf24;font-size:8px;padding:1px 5px;border-radius:3px;margin-left:5px">NEW — fixes old results bug</span></div>
+        <div class="child-sub" style="color:#92400e">Rejects if ANY of: date &gt; max_days · confidence &lt; 0.3 · empty excerpt<br>
+        Records with no parseable date: kept but flagged date_unverified=true<br>
+        Rejection reasons logged to sanity_report in final response</div>
+        <div class="child-tags"><span class="tag new">sanity_check_evidence()</span><span class="tag new">_parse_date()</span><span class="tag new">_days_ago()</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="conn"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+  <!-- Phase 5 -->
+  <div class="phase">
+    <div class="phase-hdr open" onclick="toggle(this)" style="border-color:rgba(196,181,253,.25)">
+      <div class="phase-title">
+        <span style="color:#c4b5fd">⑤ Entity Resolution + Synthesis</span>
+        <span class="phase-toggle">▲</span>
+      </div>
+      <div class="phase-sub">Group signals by canonical company · in-memory graph · learns at runtime</div>
+    </div>
+    <div class="phase-children open">
+      <div class="child">
+        <div class="child-title" style="color:#c4b5fd">EntityResolver</div>
+        <div class="child-sub">"Anthropic AI" + "anthropic.com" + "Anthropic Inc" → canonical: anthropic.com · seeded aliases + runtime learning</div>
+        <div class="child-tags"><span class="tag">entity_resolver.resolve()</span><span class="tag">entity_resolver.learn()</span></div>
+      </div>
+      <div class="child">
+        <div class="child-title" style="color:#c4b5fd">Group + rank</div>
+        <div class="child-sub">evidence_by_company{canonical_domain → [records]} · sort DESC by max confidence per company</div>
+      </div>
+      <div class="child">
+        <div class="child-title" style="color:#c4b5fd">Answer + sanity report</div>
+        <div class="child-sub">N companies found · top names · rejection count + reasons included in payload</div>
+        <div class="child-tags"><span class="tag">synthesize_answer()</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="conn"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+  <!-- Output -->
+  <div class="output">
+    <div class="output-title">📤 SSE "done" event payload</div>
+    <div class="output-grid">
+      <div class="output-field"><div class="output-key">answer</div><div class="output-val">Synthesized answer text</div></div>
+      <div class="output-field"><div class="output-key">companies[]</div><div class="output-val">Grouped by canonical domain</div></div>
+      <div class="output-field"><div class="output-key">evidence.url</div><div class="output-val">Full source URL (copyable)</div></div>
+      <div class="output-field"><div class="output-key">evidence.date</div><div class="output-val">Publication date + recency label</div></div>
+      <div class="output-field"><div class="output-key">evidence.content_type</div><div class="output-val">blog · guide · announcement…</div></div>
+      <div class="output-field"><div class="output-key">evidence.key_excerpt</div><div class="output-val">Verbatim matching passage</div></div>
+      <div class="output-field"><div class="output-key">evidence.discovered_via</div><div class="output-val">parallel_ai · exa</div></div>
+      <div class="output-field"><div class="output-key">evidence.confidence</div><div class="output-val">0–1 keyword match score</div></div>
+      <div class="output-field" style="border-color:#b45309"><div class="output-key" style="color:#f59e0b">sanity_report.rejected</div><div class="output-val">Count + reasons for filtered items</div></div>
+      <div class="output-field"><div class="output-key">pipeline_stats</div><div class="output-val">Timing · URLs per tool · pages scraped</div></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><span class="leg-dot" style="background:#7dd3fc"></span>No external API</span>
+    <span><span class="leg-dot" style="background:#86efac"></span>Parallel AI + Exa</span>
+    <span><span class="leg-dot" style="background:#fda4af"></span>Firecrawl scrape</span>
+    <span><span class="leg-dot" style="background:#fcd34d"></span>Text extraction</span>
+    <span><span class="leg-dot" style="background:#f59e0b"></span>Sanity check (new)</span>
+    <span><span class="leg-dot" style="background:#c4b5fd"></span>Entity resolution</span>
+  </div>
+
+</div>
+<script>
+function toggle(hdr) {
+  const isOpen = hdr.classList.contains('open');
+  hdr.classList.toggle('open', !isOpen);
+  const children = hdr.nextElementSibling;
+  children.classList.toggle('open', !isOpen);
+  hdr.querySelector('.phase-toggle').textContent = isOpen ? '▼' : '▲';
+}
+</script>
+</body>
+</html>

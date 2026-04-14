@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Reo.Dev — RevOps Signal Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f5f5f3;--border:#e5e5e3;--border-dk:#c5c5c0;--text:#111;--muted:#666;--faint:#999;--accent:#5b21b6;--ac-bg:#ede9fe;--ac-border:#c4b5fd;--green-bg:#f0fdf4;--green-bd:#86efac;--amber-bg:#fffbeb;--amber-bd:#fcd34d;--mono:'DM Mono',monospace;--sans:'Space Grotesk',sans-serif}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;font-size:13px}
+
+/* SIDEBAR */
+.sb{width:162px;min-width:162px;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column}
+.sb-brand{padding:13px 12px 10px;font-size:14px;font-weight:700;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px}
+.sb-nav{flex:1;overflow-y:auto;padding:7px 5px}
+.ni{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:5px;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:none;transition:background .12s}
+.ni:hover{background:#f0f0ee;color:var(--text)}.ni.active{background:var(--ac-bg);color:var(--accent);font-weight:500}
+.ni svg{width:12px;height:12px;flex-shrink:0}
+.ns{font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--faint);text-transform:uppercase;padding:9px 8px 2px}
+.sb-foot{border-top:1px solid var(--border);padding:7px 5px}
+.u-row{display:flex;align-items:center;gap:7px;padding:5px 8px;font-size:11.5px;color:var(--muted)}
+.av{width:20px;height:20px;border-radius:50%;background:#ddd;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;color:#555}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.mhdr{background:#fff;border-bottom:1px solid var(--border);padding:0 22px}
+.htop{display:flex;align-items:center;justify-content:space-between;padding:12px 0 8px}
+.mt{font-size:15.5px;font-weight:600}
+.tabs{display:flex}
+.tab{padding:7px 13px;font-size:12.5px;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap;transition:color .12s}
+.tab:hover{color:var(--text)}.tab.active{border-bottom-color:var(--accent);color:var(--accent);font-weight:500}
+.tbadge{font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:3px;font-weight:500}
+.tbadge.purple{background:var(--accent);color:#fff}.tbadge.green{background:#059669;color:#fff}.tbadge.gray{background:var(--border-dk);color:#fff}
+.tab-pane{flex:1;overflow-y:auto;padding:20px 28px 48px;display:none}
+.tab-pane.active{display:block}
+
+/* ICP bar */
+.icp-bar{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:14px}
+.icp-label{font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--faint);text-transform:uppercase;flex-shrink:0}
+.icp-pills{display:flex;flex-wrap:wrap;gap:6px;flex:1}
+.icp-pill{font-family:var(--mono);font-size:10px;padding:3px 10px;border-radius:14px;background:var(--ac-bg);color:var(--accent);border:1px solid var(--ac-border);font-weight:500}
+.icp-pill.tech{background:#f0fdf4;color:#059669;border-color:#86efac}
+.icp-pill.size{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+.icp-pill.vert{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
+.icp-edit{font-family:var(--sans);font-size:10.5px;color:var(--accent);cursor:pointer;border:none;background:none;text-decoration:underline;text-underline-offset:2px;flex-shrink:0}
+
+/* Signal summary */
+.sig-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
+.sig-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px 16px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.sig-card:hover{border-color:var(--accent);box-shadow:0 2px 12px rgba(91,33,182,.08)}
+.sig-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:8px 8px 0 0}
+.sig-card.red::before{background:#dc2626}.sig-card.purple::before{background:var(--accent)}.sig-card.amber::before{background:#d97706}.sig-card.teal::before{background:#059669}
+.sig-num{font-size:28px;font-weight:700;line-height:1;margin-bottom:2px}
+.sig-card.red .sig-num{color:#dc2626}.sig-card.purple .sig-num{color:var(--accent)}.sig-card.amber .sig-num{color:#d97706}.sig-card.teal .sig-num{color:#059669}
+.sig-title{font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:1px}
+.sig-sub{font-family:var(--mono);font-size:9px;color:var(--faint)}
+.sig-hot{position:absolute;top:12px;right:12px;font-family:var(--mono);font-size:8px;padding:2px 6px;border-radius:3px;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;font-weight:500}
+
+/* Ask bar */
+.ask-bar{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--border-dk);border-radius:12px;padding:12px 16px;transition:all .15s;box-shadow:0 1px 4px rgba(0,0,0,.04);margin-bottom:24px}
+.ask-bar:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px #ede9fe}
+.ask-input{flex:1;border:none;outline:none;font-family:var(--sans);font-size:13px;color:var(--text);background:transparent}
+.ask-input::placeholder{color:var(--faint)}
+.ask-send{background:var(--accent);border:none;border-radius:7px;color:#fff;padding:7px 16px;font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;transition:background .1s;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.ask-send:hover{background:#4c1d95}
+
+/* Section headers */
+.sec-hdr{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.sec-title{font-size:14px;font-weight:600}.sec-sub{font-size:11px;color:var(--muted)}.sec-line{flex:1;height:1px;background:var(--border)}
+
+/* Playbooks */
+.play-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px}
+.play-card{background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:18px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:8px}
+.play-card:hover{border-color:var(--accent);box-shadow:0 3px 16px rgba(91,33,182,.07);transform:translateY(-1px)}
+.play-card:hover .play-run{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-name{font-size:13.5px;font-weight:600;line-height:1.3}
+.play-desc{font-size:11px;color:var(--muted);line-height:1.55;flex:1}
+.play-chain{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:2px}
+.play-step{font-family:var(--mono);font-size:8px;padding:2px 6px;border-radius:3px;white-space:nowrap}
+.play-step.s1{background:#fef3c7;color:#92400e}.play-step.s2{background:#dbeafe;color:#1e40af}.play-step.s3{background:#fae8ff;color:#86198f}.play-step.s4{background:#fee2e2;color:#991b1b}.play-step.s5{background:#d1fae5;color:#065f46}
+.play-arr{font-size:8px;color:var(--faint)}
+.play-run{font-family:var(--sans);font-size:11px;border:1.5px solid var(--border);background:#fff;color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer;transition:all .12s;width:100%;text-align:center;font-weight:500;margin-top:auto}
+.play-example{font-family:var(--mono);font-size:9px;color:var(--faint);line-height:1.4;margin-top:2px}
+
+/* Feed */
+.feed-list{display:flex;flex-direction:column;gap:6px}
+.feed-item{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .12s}
+.feed-item:hover{border-color:var(--accent);background:#faf8ff}
+.feed-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.feed-dot.hot{background:#dc2626}.feed-dot.warm{background:#d97706}.feed-dot.new{background:var(--accent)}.feed-dot.info{background:#059669}
+.feed-txt{flex:1;font-size:12px;line-height:1.4}.feed-txt strong{font-weight:600}
+.feed-when{font-family:var(--mono);font-size:9px;color:var(--faint);flex-shrink:0}
+.feed-act{font-family:var(--sans);font-size:10px;color:var(--accent);font-weight:500;flex-shrink:0;opacity:0;transition:opacity .12s}
+.feed-item:hover .feed-act{opacity:1}
+
+/* Agent cards (individual tab) */
+.agent-section{margin-bottom:28px}
+.agent-section-hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.agent-section-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.agent-section-dot.p0{background:#dc2626}.agent-section-dot.p1{background:var(--accent)}.agent-section-dot.sc{background:#d97706}
+.agent-section-title{font-size:12.5px;font-weight:600}
+.agent-section-sub{font-size:11px;color:var(--faint)}
+.agent-section-meta{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--faint)}
+.agrid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.acard{background:#fff;border:1px dashed var(--border);border-radius:7px;padding:13px 12px 11px;cursor:pointer;transition:box-shadow .15s,border-color .15s;display:flex;flex-direction:column;gap:5px;position:relative}
+.acard:hover{box-shadow:0 2px 10px rgba(0,0,0,.07);border-color:var(--accent);border-style:solid}
+.acard:hover .btry{background:var(--ac-bg);border-color:var(--ac-border);color:var(--accent)}
+.cico{width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px}
+.cico.lb{background:#faf5ff;border:1px solid var(--ac-border)}
+.cico.rd{background:#fef2f2;border:1px solid #fca5a5}
+.cico.gn{background:var(--green-bg);border:1px solid var(--green-bd)}
+.cico.am{background:var(--amber-bg);border:1px solid var(--amber-bd)}
+.cname{font-size:12px;font-weight:600;line-height:1.2;padding-right:14px}
+.cdesc{font-size:10.5px;color:var(--muted);line-height:1.4;flex:1}
+.csig{font-family:var(--mono);font-size:9px;color:var(--faint);display:flex;align-items:center;gap:3px;margin-top:1px}
+.sdot{width:4px;height:4px;border-radius:50%;background:var(--faint);flex-shrink:0}
+.btry{margin-top:3px;font-family:var(--sans);font-size:10.5px;border:1px solid var(--border);background:#fff;color:var(--muted);padding:4px 9px;border-radius:4px;cursor:pointer;transition:all .12s;width:fit-content}
+.prio-tag{font-family:var(--mono);font-size:8px;padding:1px 5px;border-radius:3px;position:absolute;top:8px;right:8px;font-weight:500}
+.prio-tag.p0{background:#fef2f2;color:#dc2626;border:1px solid #fca5a5}
+.prio-tag.p1{background:var(--ac-bg);color:var(--accent);border:1px solid var(--ac-border)}
+.prio-tag.p2{background:var(--green-bg);color:#059669;border:1px solid var(--green-bd)}
+.prio-tag.sc{background:var(--amber-bg);color:#d97706;border:1px solid var(--amber-bd)}
+
+/* AGENT FULLSCREEN */
+.ca-exp{display:none;position:fixed;inset:0;z-index:300;background:var(--bg);flex-direction:column}
+.ca-exp.open{display:flex}
+.ca-layout{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.ca-topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;height:46px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.ca-back{background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:var(--sans);font-size:12px;color:var(--muted);padding:4px 7px;border-radius:4px;transition:background .12s}
+.ca-back:hover{background:#f0f0ee;color:var(--text)}
+.ca-sep{width:1px;height:18px;background:var(--border)}
+.ca-label{display:flex;align-items:center;gap:7px}
+.ca-agent-name{font-size:13px;font-weight:600}
+.ca-done-btn{font-family:var(--sans);font-size:12px;padding:5px 14px;border:1.5px solid #111;border-radius:5px;background:#111;color:#fff;cursor:pointer;font-weight:500;transition:background .12s}
+.ca-done-btn:hover{background:var(--accent);border-color:var(--accent)}
+.ca-body{display:flex;flex:1;overflow:hidden;min-height:0}
+.ca-chat{width:40%;min-width:340px;display:flex;flex-direction:column;background:#fff;border-right:1px solid var(--border);overflow:hidden;flex-shrink:0}
+.ca-msgs{flex:1;overflow-y:auto;padding:28px 7% 16px;display:flex;flex-direction:column;gap:16px}
+.ca-msg{display:flex;align-items:flex-start;gap:10px}.ca-msg-agent{justify-content:flex-start}.ca-msg-user{justify-content:flex-end}
+.ca-avatar{width:27px;height:27px;border-radius:50%;background:var(--ac-bg);border:1px solid var(--ac-border);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--accent);font-size:11px;margin-top:2px}
+.ca-bubble{max-width:520px;border-radius:12px;padding:11px 15px;font-size:13px;line-height:1.65}
+.ca-bubble-agent{background:#f5f5f3;border-radius:3px 12px 12px 12px;color:var(--text)}
+.ca-bubble-user{background:#111;border-radius:12px 3px 12px 12px;color:#fff;max-width:420px}
+.ca-aname{font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:.05em;margin-bottom:5px;text-transform:uppercase}
+.ca-suggs{padding-left:37px;max-width:540px;margin-top:4px}
+.ca-sugg-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin-bottom:6px}
+.ca-sugg-list{display:flex;flex-direction:column;gap:5px}
+.ca-sugg{border:1px solid var(--border);border-radius:8px;padding:9px 12px;cursor:pointer;background:#fafaf9;transition:border-color .15s,background .15s;display:flex;gap:8px}
+.ca-sugg:hover{border-color:var(--ac-border);background:var(--ac-bg)}
+.ca-sugg.used{opacity:.38;pointer-events:none}
+.ca-sugg-arr{font-size:10px;color:var(--ac-border);flex-shrink:0;margin-top:2px}
+.ca-sugg-txt{font-size:11.5px;color:var(--text);line-height:1.35;font-weight:500}
+.ca-sugg-tag{font-family:var(--mono);font-size:9px;color:var(--faint);margin-top:2px}
+.ca-thinking{display:flex;align-items:center;gap:8px;padding-left:37px}
+.ca-dots{display:flex;gap:4px}
+.ca-dots span{width:6px;height:6px;border-radius:50%;background:var(--ac-border);animation:tdp 1.4s ease-in-out infinite}
+.ca-dots span:nth-child(2){animation-delay:.2s}.ca-dots span:nth-child(3){animation-delay:.4s}
+@keyframes tdp{0%,80%,100%{transform:scale(.6);background:#ede9fe}40%{transform:scale(1);background:var(--accent)}}
+.ca-think-txt{font-size:11.5px;color:var(--muted);font-style:italic}
+.ca-input-area{border-top:1px solid var(--border);padding:13px 7% 15px;background:#fff;flex-shrink:0}
+.ca-input-wrap{display:flex;align-items:flex-end;gap:8px;border:1.5px solid var(--border-dk);border-radius:10px;padding:10px 12px;background:#fafaf9;transition:border-color .15s,background .15s;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.ca-input-wrap:focus-within{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px #ede9fe}
+.ca-textarea{flex:1;border:none;outline:none;font-family:var(--sans);font-size:13px;color:var(--text);background:transparent;resize:none;line-height:1.5;max-height:110px;overflow-y:auto}
+.ca-textarea::placeholder{color:var(--faint)}
+.ca-send{background:var(--accent);border:none;border-radius:7px;color:#fff;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background .1s}
+.ca-send:hover{background:#4c1d95}.ca-send:disabled{opacity:.4;cursor:not-allowed}
+.ca-hint{font-family:var(--mono);font-size:8.5px;color:var(--faint);margin-top:5px;text-align:center}
+.ca-results{flex:1;display:flex;flex-direction:column;overflow:hidden;background:#fafaf9;min-width:0}
+.ca-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:32px;text-align:center}
+.ca-empty p{font-size:11.5px;line-height:1.7;max-width:280px;color:var(--faint)}
+
+/* Signal type label on cards */
+.play-signal-type{font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:3px;display:inline-block;font-weight:500;margin-bottom:4px}
+.play-signal-type.sig-lead{background:#fae8ff;color:#86198f;border:1px solid #e9d5ff}
+.play-signal-type.sig-growth{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+.play-signal-type.sig-migr{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
+.play-signal-type.sig-sweep{background:var(--ac-bg);color:var(--accent);border:1px solid var(--ac-border)}
+.play-signal-type.sig-comp{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.play-signal-type.sig-build{background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe}
+.pda-card{background:#fff;border:1.5px solid var(--green-bd);border-radius:10px;padding:20px 24px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:20px;margin-bottom:28px}
+.pda-card:hover{border-color:#059669;box-shadow:0 3px 16px rgba(5,150,105,.1);transform:translateY(-1px)}
+.pda-card:hover .pda-run{background:#059669;color:#fff;border-color:#059669}
+.pda-left{flex:1}
+.pda-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.pda-badge{font-family:var(--mono);font-size:9px;background:#059669;color:#fff;padding:1px 6px;border-radius:3px}
+.pda-desc{font-size:11.5px;color:var(--muted);line-height:1.55;margin-bottom:8px;max-width:520px}
+.pda-signals{display:flex;gap:6px;flex-wrap:wrap}
+.pda-sig{font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:12px;background:var(--green-bg);color:#059669;border:1px solid var(--green-bd)}
+.pda-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0}
+.pda-run{font-family:var(--sans);font-size:12px;border:1.5px solid var(--green-bd);background:#fff;color:#059669;padding:8px 20px;border-radius:6px;cursor:pointer;transition:all .12s;font-weight:500;white-space:nowrap}
+.pda-examples{font-family:var(--mono);font-size:9px;color:var(--faint);text-align:right;line-height:1.5;max-width:200px}
+.pipeline-preview{width:100%;max-width:420px}
+.pp-header{margin-bottom:28px}
+.pp-icon{font-size:28px;margin-bottom:8px;opacity:.7}
+.pp-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:4px}
+.pp-sub{font-size:11.5px;color:var(--muted);line-height:1.5}
+.pp-steps{display:flex;flex-direction:column;align-items:stretch;gap:0;margin-bottom:24px}
+.pp-step{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#fff;border:1px solid var(--border);border-radius:8px;transition:border-color .15s}
+.pp-step-num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:600;flex-shrink:0}
+.pp-s1{background:#fef3c7;color:#92400e}.pp-s2{background:#dbeafe;color:#1e40af}.pp-s3{background:#fae8ff;color:#86198f}.pp-s4{background:#fee2e2;color:#991b1b}.pp-s5{background:#d1fae5;color:#065f46}
+.pp-step-body{flex:1;text-align:left}
+.pp-step-name{font-size:12px;font-weight:600;color:var(--text);line-height:1.2}
+.pp-step-desc{font-size:10.5px;color:var(--muted);margin-top:1px}
+.pp-step-signal{font-family:var(--mono);font-size:8.5px;color:var(--faint);flex-shrink:0;text-align:right;max-width:140px}
+.pp-step-line{width:1px;height:8px;background:var(--border);margin-left:26px}
+.pp-output{background:#fff;border:1.5px dashed var(--ac-border);border-radius:8px;padding:12px 16px;text-align:center}
+.pp-output-label{font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.pp-output-items{display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+.pp-out-tag{font-family:var(--mono);font-size:9px;padding:3px 10px;border-radius:12px;background:var(--ac-bg);color:var(--accent);border:1px solid var(--ac-border);font-weight:500}
+.ca-pipeline{background:#fff;border-bottom:1px solid var(--border);padding:9px 14px 7px;flex-shrink:0;display:none}
+.ca-phases{display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;margin-bottom:6px}
+.ca-phase{flex:1;padding:5px 8px;border-right:1px solid var(--border);display:flex;align-items:center;gap:5px;font-size:10px;color:var(--faint);transition:background .15s}
+.ca-phase:last-child{border-right:none}
+.ca-phase.running{background:rgba(91,33,182,.06);color:var(--accent)}.ca-phase.done{background:rgba(91,33,182,.04);color:var(--accent)}
+.ca-ph-spin{width:9px;height:9px;border:1.5px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ca-ph-ok{color:var(--accent);font-size:10px;flex-shrink:0;font-weight:700}
+.ca-log{font-family:var(--mono);font-size:9px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ca-res-hdr{background:#fff;border-bottom:1px solid var(--border);padding:9px 14px;display:none;align-items:center;justify-content:space-between;flex-shrink:0}
+.ca-res-title{font-size:11.5px;font-weight:600;display:flex;align-items:center;gap:6px}
+.ca-res-meta{font-family:var(--mono);font-size:9px;color:var(--faint)}
+.ca-dl-btn{font-family:var(--sans);font-size:10.5px;padding:4px 10px;border:1px solid var(--ac-border);border-radius:4px;background:var(--ac-bg);color:var(--accent);cursor:pointer;display:flex;align-items:center;gap:4px;font-weight:500;transition:all .12s}
+.ca-dl-btn:hover{background:#ddd6fe}
+.ca-tbl-scroll{flex:1;overflow:auto}
+.ca-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.ca-tbl th{padding:7px 10px;text-align:left;font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);background:#fafaf9;font-family:var(--mono);position:sticky;top:0;z-index:1;white-space:nowrap}
+.ca-tbl td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+.ca-tbl tbody tr:hover td{background:#f5f0ff}
+.co-wrap{display:flex;align-items:flex-start;gap:7px;min-width:110px}
+.co-fav{width:16px;height:16px;border-radius:3px;flex-shrink:0;margin-top:2px;object-fit:contain}
+.co-name{font-weight:600;font-size:11.5px;line-height:1.2}.co-dom{font-family:var(--mono);font-size:9px;color:var(--accent);margin-top:2px}
+.sc-pill{display:inline-block;font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:3px;font-weight:600}
+.sc-hi{background:#f0fdf4;color:#059669;border:1px solid #86efac}.sc-md{background:#fffbeb;color:#d97706;border:1px solid var(--amber-bd)}.sc-lo{background:#fef2f2;color:#dc2626;border:1px solid #fca5a5}
+.sig-badge{display:inline-block;font-family:var(--mono);font-size:8.5px;padding:2px 7px;border-radius:3px;font-weight:500;white-space:nowrap;margin:1px 2px}
+.sig-tech{background:#ede9fe;color:#5b21b6;border:1px solid var(--ac-border)}.sig-hire{background:#ecfdf5;color:#059669;border:1px solid var(--green-bd)}.sig-migr{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}.sig-exec{background:#fdf4ff;color:#7e22ce;border:1px solid #e9d5ff}.sig-scale{background:#fef3c7;color:#92400e;border:1px solid #fde68a}.sig-proj{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+.src-badge{font-family:var(--mono);font-size:8.5px;padding:2px 6px;border-radius:3px;display:inline-block;white-space:nowrap}
+.src-tech{background:#ede9fe;color:#5b21b6;border:1px solid var(--ac-border)}.src-job{background:#ecfdf5;color:#059669;border:1px solid var(--green-bd)}.src-li{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}.src-org{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}.src-act{background:#fdf4ff;color:#a21caf;border:1px solid #e879f9}
+.ca-sanity{padding:8px 14px;border-top:1px solid var(--border);background:#fff;display:none;align-items:center;gap:16px;flex-shrink:0;font-family:var(--mono);font-size:9px;color:var(--faint);flex-wrap:wrap}
+.san-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;display:inline-block}.san-ok{background:#059669}.san-md{background:#d97706}.san-info{background:#6366f1}
+.ca-filters{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:5px}
+.ca-filter{font-family:var(--mono);font-size:9px;padding:3px 9px;border-radius:12px;border:1px solid var(--border);background:#fff;color:var(--muted);cursor:pointer;transition:all .12s;white-space:nowrap}
+.ca-filter:hover{border-color:var(--border-dk);color:var(--text)}.ca-filter.active{background:var(--ac-bg);border-color:var(--ac-border);color:var(--accent);font-weight:500}
+.person-card{display:flex;align-items:center;gap:6px;padding:4px 0}
+.person-av{width:22px;height:22px;border-radius:50%;background:var(--ac-bg);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;color:var(--accent);flex-shrink:0}
+.person-info{font-size:10.5px;line-height:1.3}.person-name{font-weight:600}.person-title{color:var(--muted);font-size:10px}
+.angle-txt{font-size:10.5px;color:var(--text);line-height:1.45;background:#faf5ff;border:1px solid var(--ac-border);border-radius:5px;padding:6px 8px}
+.robadge{font-family:var(--mono);font-size:9px;background:#059669;color:#fff;padding:1px 5px;border-radius:3px}
+</style></head>
+<body>
+
+<aside class="sb">
+<div class="sb-brand"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5.5" height="5.5" rx="1.2"/><rect x="9.5" y="1" width="5.5" height="5.5" rx="1.2"/><rect x="1" y="9.5" width="5.5" height="5.5" rx="1.2"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1.2"/></svg>Reo.Dev</div>
+<nav class="sb-nav">
+<a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>Accounts</a>
+<a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg>Developers</a>
+<a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><path d="M5.5 8h5M8 5.5v5"/></svg>Segments</a>
+<a class="ni active" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l3 3 7-7"/></svg>Agents</a>
+<div class="ns">Tools</div>
+<a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12v8H2z"/></svg>Lists</a>
+<a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12V6l6-4 6 4v6"/><rect x="6" y="9" width="4" height="3"/></svg>Campaigns</a>
+</nav>
+<div class="sb-foot"><div class="u-row"><div class="av">SG</div>Sudhanva G</div></div>
+</aside>
+
+<main class="main">
+<div class="mhdr">
+<div class="htop">
+<div class="mt">Closed-source signal agent</div>
+<div style="display:flex;align-items:center;gap:6px"><span class="robadge">No OSS data</span><span style="font-family:var(--mono);font-size:9px;color:var(--faint)">Stack + Hiring + Growth + Leadership + Migration signals</span></div>
+</div>
+<div class="tabs">
+<div class="tab active" onclick="switchTab('dashboard',this)">Dashboard</div>
+<div class="tab" onclick="switchTab('playbooks',this)">Find signals</div>
+</div>
+</div>
+
+<!-- ═══ DASHBOARD TAB ═══ -->
+<div class="tab-pane active" id="pane-dashboard">
+<div class="icp-bar">
+<div class="icp-label">Monitoring</div>
+<div class="icp-pills">
+<span class="icp-pill tech">Kubernetes</span><span class="icp-pill tech">Terraform</span><span class="icp-pill tech">Go / gRPC</span>
+<span class="icp-pill size">50+ engineers</span><span class="icp-pill vert">Fintech / Dev Infra</span><span class="icp-pill">Series B+</span>
+</div>
+<button class="icp-edit" onclick="editICP()">Edit ICP</button>
+</div>
+<div style="font-size:11px;color:var(--muted);margin:-12px 0 16px 0;display:flex;align-items:center;gap:8px">
+<span style="width:6px;height:6px;border-radius:50%;background:#059669;display:inline-block"></span>
+Continuously scanning <strong style="color:var(--text);margin:0 2px">324 accounts</strong> matching your ICP — signals below are from the last 7 days
+</div>
+<div class="sig-summary">
+<div class="sig-card red" onclick="openPlaybook(0)"><div class="sig-hot">this week</div><div class="sig-num">12</div><div class="sig-title">Leadership changes</div><div class="sig-sub">New VP Eng, CTO, Head of Platform</div></div>
+<div class="sig-card purple" onclick="openPlaybook(1)"><div class="sig-num">8</div><div class="sig-title">Teams scaling fast</div><div class="sig-sub">30%+ headcount growth in 6mo</div></div>
+<div class="sig-card amber" onclick="openPlaybook(2)"><div class="sig-num">5</div><div class="sig-title">Stack migrations</div><div class="sig-sub">CI/CD, cloud, or architecture shifts</div></div>
+<div class="sig-card teal" onclick="openPlaybook(3)"><div class="sig-num">324</div><div class="sig-title">Total ICP matches</div><div class="sig-sub">Stack + team + vertical fit</div></div>
+</div>
+
+<div class="sec-hdr"><div class="sec-title">Live signals this week</div><div class="sec-sub">Recent buying signals detected across your ICP accounts</div><div class="sec-line"></div></div>
+<div class="feed-list" id="feedList"></div>
+</div>
+
+<!-- ═══ BUILD LISTS TAB ═══ -->
+<div class="tab-pane" id="pane-playbooks">
+<div class="icp-bar">
+<div class="icp-label">Your ICP</div>
+<div class="icp-pills">
+<span class="icp-pill tech">Kubernetes</span><span class="icp-pill tech">Terraform</span><span class="icp-pill tech">Go / gRPC</span>
+<span class="icp-pill size">50+ engineers</span><span class="icp-pill vert">Fintech / Dev Infra</span><span class="icp-pill">Series B+</span>
+</div>
+<button class="icp-edit" onclick="editICP()">Edit ICP</button>
+</div>
+
+<div style="margin-bottom:20px">
+<div class="sec-hdr"><div class="sec-title">What are you trying to find?</div><div class="sec-sub">Pick a buying moment — the agent chains the right signals, scores, and enriches automatically</div><div class="sec-line"></div></div>
+</div>
+<div class="play-grid" id="playGrid"></div>
+
+<div style="margin-top:24px">
+<div class="sec-hdr"><div class="sec-title">Public intelligence</div><div class="sec-sub">Signals from news, blogs, SEC filings, and company announcements</div><div class="sec-line"></div></div>
+</div>
+<div class="pda-card" onclick="openPublicAgent()">
+<div class="pda-left">
+<div class="pda-name">Trigger events &amp; market signals <span class="pda-badge">Public Data</span></div>
+<div class="pda-desc">Scan the public web for buying triggers invisible to stack and hiring data — funding rounds, product launches, market expansion, pain-signal blog posts, executive interviews, and SEC filings. Enriched with your ICP matching and scoring.</div>
+<div class="pda-signals">
+<span class="pda-sig">Funding announcements</span>
+<span class="pda-sig">Pain-signal content</span>
+<span class="pda-sig">Market expansion</span>
+<span class="pda-sig">Exec interviews</span>
+<span class="pda-sig">Build vs buy posts</span>
+<span class="pda-sig">SEC filings</span>
+</div>
+</div>
+<div class="pda-right">
+<button class="pda-run">Open agent →</button>
+<div class="pda-examples">e.g. "Series B SaaS companies<br>writing about churn in last 6mo"</div>
+</div>
+</div>
+
+<div style="margin-top:20px">
+<div class="sec-hdr"><div class="sec-title">Or describe a custom signal</div><div class="sec-sub">The agent auto-detects which signals to chain</div><div class="sec-line"></div></div>
+<div class="ask-bar" style="margin-top:12px">
+<svg viewBox="0 0 16 16" fill="none" stroke="var(--faint)" stroke-width="1.5" width="14" height="14" style="flex-shrink:0"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+<input class="ask-input" id="askInput2" placeholder="e.g. 'fintech companies migrating CI/CD with a new VP Eng and 100+ engineers'" onkeydown="if(event.key==='Enter'){event.preventDefault();askGo2()}">
+<button class="ask-send" onclick="askGo2()"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2" width="11" height="11"><path d="M13 8H3M9 4l4 4-4 4"/></svg>Find signals</button>
+</div>
+<p style="font-size:10px;color:var(--faint);margin-top:8px;line-height:1.5">Combine any signals in one query — stack detection, hiring intent, leadership changes, team growth, migration patterns, competitor evaluation. Every result comes scored with contacts and outreach angles.</p>
+</div>
+</div>
+</main>
+
+<!-- AGENT FULLSCREEN -->
+<div class="ca-exp" id="caExp">
+<div class="ca-layout">
+<div class="ca-topbar">
+<div style="display:flex;align-items:center;gap:10px">
+<button class="ca-back" onclick="closeCA()"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12"><path d="M10 3L5 8l5 5"/></svg>Back</button>
+<div class="ca-sep"></div>
+<div class="ca-label"><span style="font-size:14px">⚡</span><span class="ca-agent-name">Closed-source signal agent</span><span class="robadge">No OSS data</span></div>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<span id="caElapsed" style="font-family:var(--mono);font-size:9px;color:var(--faint);display:none"></span>
+<button class="ca-done-btn" onclick="closeCA()">Done</button>
+</div>
+</div>
+<div class="ca-body">
+<div class="ca-chat">
+<div class="ca-msgs" id="caMsgs">
+<div class="ca-msg ca-msg-agent" id="caIntro">
+<div class="ca-avatar">R</div>
+<div>
+<div class="ca-bubble ca-bubble-agent">
+<div class="ca-aname">Signal agent</div>
+<p>Running against your ICP: <strong>Kubernetes + Terraform + Go</strong>, <strong>50+ eng</strong>, <strong>Fintech / Dev Infra</strong>, <strong>Series B+</strong>.</p>
+<p style="margin-top:7px;font-size:11px;color:var(--muted)">I'll chain closed-source signals through 5 steps. Ask anything or refine below.</p>
+</div>
+<div class="ca-suggs" id="caSuggs">
+<div class="ca-sugg-lbl">Refine your search</div>
+<div class="ca-sugg-list" id="caSuggList"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="ca-input-area">
+<div class="ca-input-wrap">
+<textarea class="ca-textarea" id="caInput" rows="1" placeholder="Refine: add filters, change vertical, adjust thresholds..." oninput="caGrow(this)" onkeydown="caKey(event)"></textarea>
+<button class="ca-send" id="caSendBtn" onclick="caSend()"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2" width="11" height="11"><path d="M13 8H3M9 4l4 4-4 4"/></svg></button>
+</div>
+<div class="ca-hint">Pipeline: Seed → Intent → Trigger → Score → Enrich</div>
+</div>
+</div>
+<div class="ca-results">
+<div class="ca-empty" id="caEmpty">
+<div class="pipeline-preview" id="pipelinePreview">
+<div class="pp-header">
+<div class="pp-icon">⚡</div>
+<div class="pp-title" id="ppTitle">How this playbook works</div>
+<div class="pp-sub" id="ppSub">Select a suggestion or type your query to start the pipeline</div>
+</div>
+<div class="pp-steps" id="ppSteps">
+<div class="pp-step"><div class="pp-step-num pp-s1">1</div><div class="pp-step-body"><div class="pp-step-name">Seed</div><div class="pp-step-desc">Scan accounts matching your ICP criteria</div></div><div class="pp-step-signal">Stack detection + Team size</div></div>
+<div class="pp-step-line"></div>
+<div class="pp-step"><div class="pp-step-num pp-s2">2</div><div class="pp-step-body"><div class="pp-step-name">Intent filter</div><div class="pp-step-desc">Keep only accounts showing active momentum</div></div><div class="pp-step-signal">Growth trends + Hiring velocity</div></div>
+<div class="pp-step-line"></div>
+<div class="pp-step"><div class="pp-step-num pp-s3">3</div><div class="pp-step-body"><div class="pp-step-name">Buying trigger</div><div class="pp-step-desc">Flag accounts with a reason to buy now</div></div><div class="pp-step-signal">Leadership changes + Projects</div></div>
+<div class="pp-step-line"></div>
+<div class="pp-step"><div class="pp-step-num pp-s4">4</div><div class="pp-step-body"><div class="pp-step-name">Score</div><div class="pp-step-desc">Rank by composite signal strength</div></div><div class="pp-step-signal">Stack fit + Vertical + Intent</div></div>
+<div class="pp-step-line"></div>
+<div class="pp-step"><div class="pp-step-num pp-s5">5</div><div class="pp-step-body"><div class="pp-step-name">Enrich</div><div class="pp-step-desc">Map contacts and generate outreach angles</div></div><div class="pp-step-signal">Buyer identification + Messaging</div></div>
+</div>
+<div class="pp-output">
+<div class="pp-output-label">Output</div>
+<div class="pp-output-items">
+<span class="pp-out-tag">Scored accounts</span>
+<span class="pp-out-tag">Best contacts</span>
+<span class="pp-out-tag">Outreach angles</span>
+<span class="pp-out-tag">CRM-ready export</span>
+</div>
+</div>
+</div>
+</div>
+<div class="ca-pipeline" id="caPipeline" style="display:none">
+<div class="ca-phases">
+<div class="ca-phase" id="ph-seed"><span class="ph-ico" style="font-size:9px">.</span> Seed</div>
+<div class="ca-phase" id="ph-filter"><span class="ph-ico" style="font-size:9px">.</span> Intent</div>
+<div class="ca-phase" id="ph-trigger"><span class="ph-ico" style="font-size:9px">.</span> Trigger</div>
+<div class="ca-phase" id="ph-score"><span class="ph-ico" style="font-size:9px">.</span> Score</div>
+<div class="ca-phase" id="ph-enrich"><span class="ph-ico" style="font-size:9px">.</span> Enrich</div>
+</div>
+<div class="ca-log" id="caLog">Waiting...</div>
+</div>
+<div class="ca-res-hdr" id="caResHdr" style="display:none">
+<div style="display:flex;flex-direction:column;gap:5px;flex:1">
+<div class="ca-res-title"><span id="caResCount">Results</span><span class="ca-res-meta" id="caResMeta"></span></div>
+<div class="ca-filters">
+<span style="font-family:var(--mono);font-size:9px;color:var(--faint)">Filter:</span>
+<button class="ca-filter active" onclick="applyF('all',this)">All</button>
+<button class="ca-filter" onclick="applyF('hi',this)">Score ≥ 80</button>
+<button class="ca-filter" onclick="applyF('trigger',this)">Buying trigger</button>
+<button class="ca-filter" onclick="applyF('migr',this)">Migration</button>
+</div>
+</div>
+<button class="ca-dl-btn" onclick="dlCSV()"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="10" height="10"><path d="M4 13h8M8 3v7M5 7l3 3 3-3"/></svg>Export to CRM</button>
+</div>
+<div class="ca-tbl-scroll" id="caTblScroll" style="display:none">
+<table class="ca-tbl"><thead><tr><th>Account</th><th>Signals</th><th>Score</th><th>Key insight</th><th>Best contact</th><th>Outreach angle</th><th>Sources</th></tr></thead><tbody id="caTbody"></tbody></table>
+</div>
+<div class="ca-sanity" id="caSanity" style="display:none"></div>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+const PLAYS=[
+{nm:'New exec = new budget',signalType:'Leadership change signal',signalClass:'sig-lead',desc:'Accounts where a VP Eng, CTO, or Head of Platform joined in the last 90 days. New leaders re-evaluate tooling — your window to get in.',chain:['Leadership changes','ICP filter','Score','Contacts'],prompt:'Find accounts in my ICP where a new VP Engineering, CTO, or Head of Platform was hired in the last 90 days. Score by ICP fit and give me contacts + outreach angles.',example:'"Which accounts hired a new VP of Engineering or CTO in the last 90 days?"',
+pipelineSteps:[
+{name:'Detect leadership changes',desc:'Scan for VP Eng, CTO, Head of Platform hires in last 90 days',signal:'Leadership change signal'},
+{name:'Match against ICP',desc:'Filter to accounts that fit your stack + size + vertical',signal:'Stack detection + Team size'},
+{name:'Check momentum',desc:'Prioritize accounts also showing scaling or migration',signal:'Growth trends + Migration'},
+{name:'Score and rank',desc:'Weight by recency of hire + ICP overlap + intent',signal:'Composite fit score'},
+{name:'Map contacts + angles',desc:'Find the new leader + craft onboarding-window messaging',signal:'Buyer ID + Personalization'},
+],
+suggestions:[
+{t:'Find accounts where a new VP Engineering, CTO, or Head of Platform was hired in the last 90 days',tag:'Default — all senior hires'},
+{t:'New VPs of Engineering who previously worked at companies using our product',tag:'Champion tracking'},
+{t:'New CTOs hired from FAANG companies into Series B-C startups in the last 60 days',tag:'Narrow — FAANG origin + stage'},
+]},
+{nm:'Scaling infra teams',signalType:'Team growth signal',signalClass:'sig-growth',desc:'Companies growing their platform or DevOps teams by 30%+. Rapid hiring means tooling pain is real and budget exists.',chain:['Team growth','Stack match','Score','Angles'],prompt:'Show me companies in my ICP where the platform engineering or DevOps team grew 30%+ in the last 6 months. Score and enrich with contacts.',example:'"Show me companies scaling their Kubernetes headcount by 30%+ in 6 months"',
+pipelineSteps:[
+{name:'Detect team growth',desc:'Find accounts where platform/DevOps grew 30%+ in 6 months',signal:'Team growth signal'},
+{name:'Validate stack fit',desc:'Confirm their tech stack overlaps with your ICP',signal:'Stack detection'},
+{name:'Check hiring velocity',desc:'Cross-reference with open roles to confirm active investment',signal:'Hiring intent signal'},
+{name:'Score and rank',desc:'Weight by growth rate + stack overlap + vertical fit',signal:'Composite fit score'},
+{name:'Map contacts + angles',desc:'Identify infra leaders + craft growth-pain messaging',signal:'Buyer ID + Personalization'},
+],
+suggestions:[
+{t:'Companies where the platform or DevOps team grew 30%+ in the last 6 months',tag:'Default — all scaling teams'},
+{t:'Companies that doubled their Kubernetes engineering team in the last year',tag:'Aggressive growth — K8s focused'},
+{t:'Fintech companies scaling their infrastructure team with 5+ open roles right now',tag:'Narrow — fintech + active hiring'},
+]},
+{nm:'Migration in progress',signalType:'Stack migration signal',signalClass:'sig-migr',desc:'Accounts displacing legacy stacks — moving off Jenkins, Heroku, monoliths. Highest-intent moment to sell into.',chain:['Migration detection','Hiring patterns','Score','Brief'],prompt:'Find companies in my ICP showing migration signals — dropping Jenkins, moving off Heroku, or shifting from monolith to microservices. Score by urgency and give me outreach angles.',example:'"Find companies dropping Splunk and adding Datadog to their stack"',
+pipelineSteps:[
+{name:'Detect migrations',desc:'Find accounts with stack displacement patterns',signal:'Migration detection'},
+{name:'Confirm via hiring',desc:'Cross-reference with roles mentioning new-stack technologies',signal:'Hiring intent signal'},
+{name:'Assess urgency',desc:'Score by how far along the migration appears',signal:'Team growth + Stack changes'},
+{name:'Score and rank',desc:'Weight by migration stage + ICP fit + team size',signal:'Composite fit score'},
+{name:'Map contacts + angles',desc:'Find migration owners + craft before/after messaging',signal:'Buyer ID + Personalization'},
+],
+suggestions:[
+{t:'Companies migrating from Jenkins to GitHub Actions or from Heroku to Kubernetes',tag:'Default — CI/CD + infra migration'},
+{t:'Companies moving from monolith to microservices based on hiring patterns',tag:'Architecture migration'},
+{t:'Companies dropping legacy observability tools like Splunk or Nagios',tag:'Observability displacement'},
+]},
+{nm:'Full ICP sweep',signalType:'All signals combined',signalClass:'sig-sweep',desc:'Run all 5 signal layers against your entire ICP. Returns every account with any active signal, ranked by composite score. Your weekly pipeline builder.',chain:['All signals','Filter','Rank','Enrich'],prompt:'Run a full sweep of my ICP: find all matching accounts, apply all intent and timing filters, flag buying triggers, score by composite fit, and return top 25 with contacts and angles.',example:'"Build me a complete outbound list from all active signals"',
+pipelineSteps:[
+{name:'Full ICP scan',desc:'Match all accounts against your complete ICP criteria',signal:'All stack + size + vertical'},
+{name:'Apply all intent filters',desc:'Check every account for growth, migration, and hiring signals',signal:'All timing signals'},
+{name:'Flag all triggers',desc:'Scan for leadership changes, projects, competitor evals',signal:'All trigger signals'},
+{name:'Composite score + rank',desc:'Combine all signal weights into a single score per account',signal:'Full composite score'},
+{name:'Enrich top 25',desc:'Map contacts and generate angles for the highest-ranked',signal:'Buyer ID + Personalization'},
+],
+suggestions:[
+{t:'Full sweep: find all ICP matches with any active signal, rank top 25 with contacts and angles',tag:'Default — complete pipeline'},
+{t:'Full sweep but only fintech and dev infra verticals, minimum score 80',tag:'Tighter — vertical + score floor'},
+{t:'Weekly refresh: what changed in my ICP since last Monday?',tag:'Delta view — new signals only'},
+]},
+{nm:'Competitive displacement',signalType:'Competitor evaluation signal',signalClass:'sig-comp',desc:'Companies evaluating competitor tools or OSS alternatives in your category. Active buying cycle — they are already shopping.',chain:['Competitor eval','ICP match','Score','Hook'],prompt:'Find companies in my ICP where developers are actively evaluating competitors or open source alternatives to API gateways, service mesh, or ingress controllers. Give me displacement angles.',example:'"Companies where devs are active on multiple open source voice AI projects"',
+pipelineSteps:[
+{name:'Detect competitor activity',desc:'Find accounts where devs are evaluating rival or OSS tools',signal:'Competitor evaluation'},
+{name:'Match against ICP',desc:'Filter to accounts that fit your stack + size + vertical',signal:'Stack detection + Team size'},
+{name:'Assess displacement readiness',desc:'Check for pain signals: scaling issues, hiring for alternatives',signal:'Hiring intent + Growth'},
+{name:'Score and rank',desc:'Weight by eval depth + ICP fit + pain indicators',signal:'Composite fit score'},
+{name:'Map contacts + hooks',desc:'Identify evaluators + craft competitive displacement messaging',signal:'Buyer ID + Competitive angle'},
+],
+suggestions:[
+{t:'Companies evaluating open source alternatives to API gateways, service mesh, or ingress',tag:'Default — our category'},
+{t:'Companies where developers are actively comparing Istio vs Linkerd vs Envoy',tag:'Specific — service mesh evaluation'},
+{t:'Accounts currently using a competitor tool AND showing scaling pain signals',tag:'Ripe for displacement'},
+]},
+{nm:'Build vs buy moment',signalType:'Project investment signal',signalClass:'sig-build',desc:'Engineering teams hiring to build what you sell — internal platforms, custom tooling. Classic signal to pitch TCO and time-to-value.',chain:['Project signals','Hiring intent','Score','TCO angle'],prompt:'Show me companies in my ICP that are hiring to build internal developer platforms, custom CI/CD, or infrastructure abstractions. Give me TCO-based outreach angles.',example:'"Companies working on building internal developer platforms with 50+ engineers"',
+pipelineSteps:[
+{name:'Detect build signals',desc:'Find accounts hiring to build what your product already does',signal:'Project investment signal'},
+{name:'Validate with hiring',desc:'Confirm active roles for the function they\'re building in-house',signal:'Hiring intent signal'},
+{name:'Estimate internal cost',desc:'Calculate approximate cost of their build based on open roles',signal:'Team size + Role data'},
+{name:'Score and rank',desc:'Weight by build investment + ICP fit + urgency',signal:'Composite fit score'},
+{name:'Map contacts + TCO',desc:'Find build owners + craft cost-comparison messaging',signal:'Buyer ID + TCO angle'},
+],
+suggestions:[
+{t:'Companies hiring to build internal developer platforms, custom CI/CD, or infra abstractions',tag:'Default — build vs buy'},
+{t:'Companies with 5+ open roles for platform engineering and no existing platform vendor',tag:'Greenfield build signal'},
+{t:'Engineering teams blogging about building internal tooling in the last 6 months',tag:'Public build signal'},
+]},
+];
+
+const AGENTS_DATA=[
+{cat:'ICP Discovery',catdot:'p1',catsub:'Seed your target list from stack + team + vertical',catmeta:'P1 · Stack detection + Hiring intent + Team size',agents:[
+{ico:'lb',nm:'Lead finder',desc:'Surface accounts matching tech stack, team size, hiring signals, and developer activity',sig:'Stack detection + Hiring intent + Team size',prio:'p1',prompt:'Find me companies using Kubernetes with an engineering team of 50+ that are actively hiring for backend roles'},
+{ico:'lb',nm:'Tech shops',desc:'Find companies deeply embedded in technologies complementary to your product',sig:'Complementary stack signal',prio:'p1',prompt:'Get me companies deeply embedded in any CI tool — Jenkins, Argo CD, or CircleCI — that also use Terraform'},
+{ico:'lb',nm:'Tech hiring',desc:'Companies actively recruiting for roles requiring specific technologies',sig:'Hiring intent signal',prio:'p1',prompt:'Which companies are hiring for platform engineers with Kubernetes and Terraform experience?'},
+{ico:'lb',nm:'Headcount fit',desc:'Filter for accounts exceeding engineering headcount thresholds in specific functions',sig:'Team size filter',prio:'p2',prompt:'Show me companies with more than 100 engineers in their DevOps or platform engineering org'},
+]},
+{cat:'Timing & Intent',catdot:'p1',catsub:'Filter for accounts with active momentum',catmeta:'P1 · Migration detection + Growth signals + Hiring velocity',agents:[
+{ico:'am',nm:'Tech migrations',desc:'Detect stack displacement — companies switching from one tool to another',sig:'Migration detection + Hiring patterns',prio:'p1',prompt:'Find companies showing signals of migrating from Jenkins to GitHub Actions or from Heroku to Kubernetes'},
+{ico:'am',nm:'Tech scaling',desc:'Companies growing usage, team size, or hiring around a specific technology',sig:'Team growth trend',prio:'p1',prompt:'Show me companies that have grown their Kubernetes headcount by 30%+ in the last 6 months'},
+{ico:'am',nm:'Team scaling',desc:'Accounts with significant engineering growth in a specific function',sig:'Function growth rate',prio:'p1',prompt:'Find companies where the platform engineering team has doubled in the last year'},
+{ico:'am',nm:'Custom investment',desc:'Combine multiple tech and headcount conditions into compound signals',sig:'Compound signal builder',prio:'p1',prompt:'Show me companies building on Kubernetes for 2+ years with more than 50 DevOps engineers'},
+]},
+{cat:'Buying Triggers',catdot:'p0',catsub:'Find accounts with a reason to buy now',catmeta:'P0 · Leadership changes + Project investment + Competitor evaluation',agents:[
+{ico:'rd',nm:'Senior hire tracker',desc:'Accounts that brought on senior technical leaders — a strong buying trigger',sig:'Leadership change signal',prio:'p0',prompt:'Which accounts hired a new VP of Engineering, CTO, or Head of Platform in the last 90 days?'},
+{ico:'rd',nm:'Tech projects',desc:'Companies investing in specific engineering initiatives based on hiring + activity',sig:'Project investment signal',prio:'p2',prompt:'Show me companies building an internal developer platform with at least 50 engineers'},
+{ico:'rd',nm:'Competitive eval',desc:'Companies where developers are evaluating competitor or alternative projects',sig:'Competitor evaluation signal',prio:'p2',prompt:'Find companies where developers are active on multiple open source alternatives in our category'},
+]},
+{cat:'Scoring & Enrichment',catdot:'sc',catsub:'Rank, enrich, and activate the list',catmeta:'Scoring · Composite signals across all data',agents:[
+{ico:'gn',nm:'ICP score + rank',desc:'Score accounts by tech fitment, industry fit, and dev activity, then rank the list',sig:'Composite fit score',prio:'sc',prompt:'Score my target accounts by tech stack overlap, industry fit, and dev activity. Rank top 25.'},
+{ico:'gn',nm:'Contact mapping',desc:'Identify the right personas at each account by role, seniority, and function',sig:'Buyer identification',prio:'sc',prompt:'For the top 25 accounts, find the best contact: VP Eng, Head of Platform, or Staff engineer in infra'},
+{ico:'gn',nm:'Outreach angles',desc:'Generate personalized hooks based on each account\'s signals and stack',sig:'Signal-based messaging',prio:'sc',prompt:'For each account with a migration or scaling signal, generate a personalized outreach angle'},
+{ico:'gn',nm:'Account briefs',desc:'Auto-generate a briefing doc covering tech stack, hires, team structure, and usage',sig:'Account intelligence',prio:'sc',prompt:'Prep me for my call with the top 5 accounts — what should I know about their eng org?'},
+{ico:'gn',nm:'Social signals',desc:'Find technical buyers based on social activity — posts, comments on relevant topics',sig:'Social engagement signal',prio:'p2',prompt:'Get me Senior Technical Buyers who are talking about platform engineering or Kubernetes on LinkedIn'},
+]},
+];
+
+const FEED=[
+{dot:'hot',txt:'<strong>Acme Cloud</strong> hired a new VP of Engineering (Sarah Chen, ex-Stripe) — 32 days ago',when:'2d ago',prompt:'Tell me everything about Acme Cloud — tech stack, team size, recent hires, and best outreach angle for their new VP Eng'},
+{dot:'hot',txt:'<strong>DataForge</strong> posted 8 platform eng roles mentioning GitHub Actions + Terraform — migration from Jenkins detected',when:'3d ago',prompt:'Deep dive on DataForge: what are they migrating from, team size, and who to reach about their CI/CD transition'},
+{dot:'warm',txt:'<strong>NeuralOps</strong> engineering grew 40 to 85 in 6 months — 12 open ML infra roles with K8s requirements',when:'5d ago',prompt:'Show me NeuralOps scaling signals and the best entry point for a platform tooling conversation'},
+{dot:'new',txt:'<strong>CloudPeak Systems</strong> new CTO (David Park, ex-AWS) + Heroku-to-Kubernetes migration pattern detected',when:'1w ago',prompt:'Build an account brief for CloudPeak Systems — new CTO background, migration signals, and a personalized outreach hook'},
+{dot:'warm',txt:'<strong>FinScale</strong> platform team doubled in 12 months — 130+ engineers, deep Kafka + K8s stack in fintech',when:'1w ago',prompt:'Score FinScale against my ICP and find the best contact for a platform tooling conversation'},
+{dot:'info',txt:'<strong>3 new accounts</strong> entered your ICP this week from Series B funding rounds in dev infra vertical',when:'this week',prompt:'Show me the 3 new ICP accounts from recent funding rounds, scored with contacts'},
+{dot:'new',txt:'<strong>Verigate</strong> security engineering expanding — 6 open roles, evaluating HashiCorp Vault alternatives',when:'4d ago',prompt:'Deep dive Verigate: security tools they evaluate, team size, and the competitive angle'},
+];
+
+const MOCK_DATA=[
+{name:'Acme Cloud',dom:'acmecloud.io',sigs:['tech_shop','tech_scaling','senior_hire'],score:94,insight:'K8s headcount grew 45% in 6mo. New VP Eng (ex-Stripe) hired 32d ago. Active Terraform + ArgoCD stack.',contact:'Sarah Chen',ctitle:'VP of Engineering',cstart:'32 days ago',angle:'New VP Eng from Stripe will want to professionalize infra tooling. Lead with how you helped similar scale-ups consolidate after a senior hire.',sources:['Stack detection','Hiring intent','Leadership change']},
+{name:'DataForge',dom:'dataforge.dev',sigs:['tech_migration','tech_hiring','tech_shop'],score:91,insight:'Migrating Jenkins to GitHub Actions. 8 open platform eng roles. Terraform + Datadog stack.',contact:'Marcus Rivera',ctitle:'Head of Platform',cstart:'Active role',angle:'Mid-migration from Jenkins means re-evaluating every CI/CD tool. Position as the layer that makes GH Actions enterprise-ready.',sources:['Migration detection','Hiring intent']},
+{name:'FinScale',dom:'finscale.com',sigs:['tech_shop','team_scaling','headcount_fit'],score:88,insight:'130+ eng. Platform team doubled in 12mo. Deep Kafka + K8s + Postgres. Fintech.',contact:'Priya Sharma',ctitle:'Director of Infrastructure',cstart:'8mo tenure',angle:'Fintech compliance + rapid scaling = need for reliable infra abstraction. Reference similar fintech wins.',sources:['Stack detection','Team growth','Company intel']},
+{name:'NeuralOps',dom:'neuralops.ai',sigs:['tech_project','tech_scaling','tech_hiring'],score:86,insight:'Building internal ML platform. 12 ML infra roles. Team grew 40 to 85 in 6mo. K8s + Ray.',contact:'James Wu',ctitle:'Staff Engineer, ML Infra',cstart:'Active builder',angle:'Hiring to build what you sell. Lead with TCO: 12 open roles = $2.4M/yr vs your platform license.',sources:['Hiring intent','Dev activity','Team growth']},
+{name:'CloudPeak Systems',dom:'cloudpeak.io',sigs:['senior_hire','tech_shop','tech_migration'],score:84,insight:'New CTO from AWS, 45d ago. Migrating Heroku to K8s. Go + gRPC + Envoy.',contact:'David Park',ctitle:'CTO',cstart:'45 days ago',angle:'New CTO from AWS + Heroku exit = clean-slate decisions. Lead with migration acceleration.',sources:['Leadership change','Stack detection']},
+{name:'Nextera Analytics',dom:'nextera.co',sigs:['tech_scaling','headcount_fit','tech_shop'],score:82,insight:'Data eng grew 15 to 38 in 9mo. Airflow + dbt + Snowflake. Adding Kafka.',contact:'Lisa Tran',ctitle:'VP Data Engineering',cstart:'1yr tenure',angle:'Rapid data scaling + Kafka adoption = infra complexity explosion. Pitch observability for data pipes.',sources:['Team growth','Stack detection','Hiring intent']},
+{name:'Verigate',dom:'verigate.com',sigs:['tech_hiring','tech_shop','competitive_eval'],score:79,insight:'6 security eng roles. HashiCorp Vault + Terraform. Evaluating competitor OSS.',contact:'Alex Kowalski',ctitle:'Head of Security Eng',cstart:'Active role',angle:'Security expansion + competitor eval = active buying cycle. Lead with security-first positioning.',sources:['Hiring intent','Dev activity','Stack detection']},
+{name:'ScaleGrid',dom:'scalegrid.tech',sigs:['team_scaling','tech_shop'],score:76,insight:'DevOps grew 60% in 6mo. K8s + Prometheus + Grafana. Series B ($28M).',contact:'Ravi Patel',ctitle:'Eng Manager, DevOps',cstart:'6mo tenure',angle:'Post-Series B scaling = budget and mandate to professionalize. Pitch enterprise reliability.',sources:['Team growth','Stack detection','Company intel']},
+{name:'TrustLayer',dom:'trustlayer.io',sigs:['tech_migration','tech_hiring'],score:73,insight:'Monolith to microservices. 4 backend roles: gRPC + K8s. 65 engineers.',contact:'Nina Chen',ctitle:'Senior Staff Engineer',cstart:'Active builder',angle:'Monolith exit is 12-18mo. Position as the platform that cuts that timeline in half.',sources:['Migration detection','Hiring intent']},
+{name:'Orbis Payments',dom:'orbispay.com',sigs:['tech_shop','headcount_fit'],score:70,insight:'110 eng. AWS + Terraform + PostgreSQL. Fintech. Stable platform team.',contact:'Tom Bradley',ctitle:'Director of Engineering',cstart:'2yr tenure',angle:'Large stable fintech = consolidation play. Lead with cost optimization + compliance.',sources:['Stack detection','Company intel','Team growth']},
+];
+
+const SUGG_PROMPTS=[
+{t:'Also include healthtech and cybersecurity verticals — expand the ICP scope',tag:'Broaden vertical'},
+{t:'Only show accounts where the senior hire came from a company that already uses our product',tag:'Champion tracking'},
+{t:'Add filter: must have at least 3 open infra roles in last 30 days',tag:'Tighten hiring signal'},
+{t:'Cross-reference with our CRM — remove accounts with open deals',tag:'CRM dedup'},
+];
+
+function switchTab(tab,el){
+document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+el.classList.add('active');
+document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+document.getElementById('pane-'+tab).classList.add('active');
+}
+
+let byoOpen=false;
+
+function buildPlaybooks(){
+const g=document.getElementById('playGrid');
+PLAYS.forEach((p,i)=>{
+const d=document.createElement('div');d.className='play-card';
+d.onclick=()=>openPlaybook(i);
+const chain=p.chain.map((s,j)=>`<span class="play-step s${Math.min(j+1,5)}">${esc(s)}</span>${j<p.chain.length-1?'<span class="play-arr">→</span>':''}`).join('');
+d.innerHTML=`<div class="play-name">${esc(p.nm)}</div>
+<div class="play-desc">${esc(p.desc)}</div>
+<div class="play-chain">${chain}</div>
+<div class="play-example">e.g. ${esc(p.example.replace(/^"/,'').replace(/"$/,''))}</div>
+<button class="play-run">Scan for this signal →</button>`;
+g.appendChild(d);
+});
+}
+
+function openPlaybook(i){
+window.IS_PUBLIC = false;
+const p=PLAYS[i];
+resetCA();
+document.getElementById('caExp').classList.add('open');
+document.getElementById('caSuggs').style.display='';
+
+const introEl=document.getElementById('caIntro');
+introEl.querySelector('.ca-bubble-agent').innerHTML=`
+<div class="ca-aname">${esc(p.nm)}</div>
+<p>${esc(p.desc)}</p>
+<p style="margin-top:6px;font-size:12px">This playbook chains: <strong>${p.chain.join(' → ')}</strong> against your ICP.</p>
+<p style="margin-top:7px;font-size:11px;color:var(--muted)">Describe what you're looking for below, or pick a suggestion.</p>`;
+
+const list=document.getElementById('caSuggList');list.innerHTML='';
+document.querySelector('#caSuggs .ca-sugg-lbl').textContent='Try a query';
+const suggestions=p.suggestions||[{t:p.prompt,tag:'Default query'}];
+suggestions.forEach(s=>{
+const el=document.createElement('div');el.className='ca-sugg';
+el.onclick=()=>{el.classList.add('used');runQuery(s.t)};
+el.innerHTML=`<div class="ca-sugg-arr">→</div><div><div class="ca-sugg-txt">${esc(s.t.length>110?s.t.slice(0,107)+'...':s.t)}</div><div class="ca-sugg-tag">${esc(s.tag)}</div></div>`;
+list.appendChild(el);
+});
+
+document.getElementById('caInput').placeholder='Describe what you want to find...';
+
+// Update pipeline preview for this playbook
+document.getElementById('ppTitle').textContent=p.nm;
+document.getElementById('ppSub').textContent='Select a suggestion or type your query to start the pipeline';
+
+const stepsEl=document.getElementById('ppSteps');
+const stepConfigs=p.pipelineSteps||[
+{name:'Seed',desc:'Scan ICP-matching accounts',signal:'Stack detection + Team size'},
+{name:'Intent filter',desc:'Keep accounts with momentum',signal:'Growth trends + Hiring velocity'},
+{name:'Buying trigger',desc:'Flag reason to buy now',signal:'Leadership changes + Projects'},
+{name:'Score',desc:'Rank by composite strength',signal:'Stack fit + Vertical + Intent'},
+{name:'Enrich',desc:'Map contacts + angles',signal:'Buyer ID + Signal messaging'},
+];
+stepsEl.innerHTML=stepConfigs.map((s,j)=>{
+const colors=['pp-s1','pp-s2','pp-s3','pp-s4','pp-s5'];
+return `<div class="pp-step"><div class="pp-step-num ${colors[j]}">${j+1}</div><div class="pp-step-body"><div class="pp-step-name">${esc(s.name)}</div><div class="pp-step-desc">${esc(s.desc)}</div></div><div class="pp-step-signal">${esc(s.signal)}</div></div>${j<stepConfigs.length-1?'<div class="pp-step-line"></div>':''}`;
+}).join('');
+
+setTimeout(()=>document.getElementById('caInput').focus(),100);
+}
+
+function buildAgents(){
+const wrap=document.getElementById('agentSections');
+AGENTS_DATA.forEach(section=>{
+const sec=document.createElement('div');sec.className='agent-section';
+sec.innerHTML=`<div class="agent-section-hdr"><div class="agent-section-dot ${section.catdot}"></div><div class="agent-section-title">${esc(section.cat)}</div><div class="agent-section-sub">— ${esc(section.catsub)}</div><div class="agent-section-meta">${esc(section.catmeta)}</div></div>`;
+const grid=document.createElement('div');grid.className='agrid';
+section.agents.forEach(a=>{
+const d=document.createElement('div');d.className='acard';d.onclick=()=>openCAWith(a.prompt);
+const icoMap={lb:'lb',am:'am',rd:'rd',gn:'gn'};
+const catIco={lb:'🎯',am:'⏱',rd:'🔴',gn:'📊'};
+d.innerHTML=`<span class="prio-tag ${a.prio}">${a.prio.toUpperCase()}</span>
+<div class="cico ${icoMap[a.ico]||'lb'}">${catIco[a.ico]||'🎯'}</div>
+<div class="cname">${esc(a.nm)}</div>
+<div class="cdesc">${esc(a.desc)}</div>
+<div class="csig"><span class="sdot"></span>${esc(a.sig)}</div>
+<button class="btry">Run single signal →</button>`;
+grid.appendChild(d);
+});
+sec.appendChild(grid);wrap.appendChild(sec);
+});
+}
+
+function buildFeed(){
+const f=document.getElementById('feedList');
+FEED.forEach(item=>{
+const d=document.createElement('div');d.className='feed-item';d.onclick=()=>openCAWith(item.prompt);
+d.innerHTML=`<div class="feed-dot ${item.dot}"></div><div class="feed-txt">${item.txt}</div><div class="feed-when">${esc(item.when)}</div><div class="feed-act">Explore →</div>`;
+f.appendChild(d);
+});
+}
+
+const PUBLIC_AGENT={
+nm:'Trigger events & market signals',
+desc:'Scans the public web — news, blogs, SEC filings, company announcements — for buying triggers invisible to stack and hiring data. Results are enriched with Reo\'s ICP matching.',
+suggestions:[
+{t:'Which B2B SaaS companies have announced a new VP of Customer Success or Head of Post-Sales in the last 90 days based on blogs or press releases?',tag:'Trigger — new decision maker'},
+{t:'Find companies that raised a Series B or C in the last 6 months AND published content about scaling their engineering or infrastructure team',tag:'Trigger — funding + growth signal'},
+{t:'Find companies that have publicly written about customer churn, retention challenges, or onboarding friction in their blogs in the last 6 months',tag:'Pain signal — churn + retention'},
+{t:'Which engineering teams published blog posts about building internal developer dashboards, health score systems, or custom tooling in the last 6 months?',tag:'Build vs buy — internal tooling'},
+{t:'Which SaaS companies published blogs about expanding into a new market or launching a new product line in the last 90 days?',tag:'Trigger — market expansion'},
+],
+pipelineSteps:[
+{name:'Parse query intent',desc:'Understand what trigger events or pain signals to search for',signal:'Query understanding'},
+{name:'Search public web',desc:'Scan news, blogs, SEC filings, and company announcements',signal:'Exa + Firecrawl + Parallel AI'},
+{name:'Extract evidence',desc:'Pull key excerpts, dates, and company attribution from results',signal:'Content extraction'},
+{name:'Match against ICP',desc:'Filter results to companies matching your saved ICP criteria',signal:'Stack + Team + Vertical fit'},
+{name:'Score and rank',desc:'Confidence-score each evidence piece and rank by relevance',signal:'Signal confidence + Recency'},
+],
+};
+
+function openPublicAgent(){
+window.IS_PUBLIC = true;
+resetCA();
+document.getElementById('caExp').classList.add('open');
+document.getElementById('caSuggs').style.display='';
+
+const introEl=document.getElementById('caIntro');
+introEl.querySelector('.ca-bubble-agent').innerHTML=`
+<div class="ca-aname" style="color:#059669">Public intelligence agent</div>
+<p>${esc(PUBLIC_AGENT.desc)}</p>
+<p style="margin-top:7px;font-size:11px;color:var(--muted)">Describe what trigger events or pain signals you're looking for, or pick a suggestion below.</p>`;
+
+introEl.querySelector('.ca-avatar').style.background='var(--green-bg)';
+introEl.querySelector('.ca-avatar').style.borderColor='var(--green-bd)';
+introEl.querySelector('.ca-avatar').style.color='#059669';
+introEl.querySelector('.ca-avatar').textContent='P';
+
+const list=document.getElementById('caSuggList');list.innerHTML='';
+document.querySelector('#caSuggs .ca-sugg-lbl').textContent='Try a query';
+PUBLIC_AGENT.suggestions.forEach(s=>{
+const el=document.createElement('div');el.className='ca-sugg';
+el.onclick=()=>{el.classList.add('used');runQuery(s.t)};
+el.innerHTML=`<div class="ca-sugg-arr" style="color:var(--green-bd)">→</div><div><div class="ca-sugg-txt">${esc(s.t.length>110?s.t.slice(0,107)+'...':s.t)}</div><div class="ca-sugg-tag">${esc(s.tag)}</div></div>`;
+list.appendChild(el);
+});
+
+document.getElementById('caInput').placeholder='Describe trigger events or pain signals to search for...';
+
+document.getElementById('ppTitle').textContent='Trigger events & market signals';
+document.getElementById('ppSub').textContent='Select a suggestion or type your query to scan the public web';
+document.querySelector('.pp-icon').textContent='🌐';
+
+const stepsEl=document.getElementById('ppSteps');
+stepsEl.innerHTML=PUBLIC_AGENT.pipelineSteps.map((s,j)=>{
+const colors=['pp-s1','pp-s2','pp-s3','pp-s4','pp-s5'];
+return `<div class="pp-step"><div class="pp-step-num ${colors[j]}">${j+1}</div><div class="pp-step-body"><div class="pp-step-name">${esc(s.name)}</div><div class="pp-step-desc">${esc(s.desc)}</div></div><div class="pp-step-signal">${esc(s.signal)}</div></div>${j<PUBLIC_AGENT.pipelineSteps.length-1?'<div class="pp-step-line"></div>':''}`;
+}).join('');
+
+setTimeout(()=>document.getElementById('caInput').focus(),100);
+}
+
+function editICP(){
+document.querySelectorAll('.icp-pills').forEach(bar=>{
+bar.innerHTML='<input style="flex:1;border:1.5px solid var(--accent);border-radius:8px;padding:6px 10px;font-family:var(--sans);font-size:12px;outline:none;background:#faf5ff" value="Kubernetes, Terraform, Go/gRPC | 50+ engineers | Fintech, Dev Infra | Series B+">';
+});
+document.querySelector('.icp-pills input').focus();
+}
+
+function askGo2(){window.IS_PUBLIC=false;const v=document.getElementById('askInput2').value.trim();if(v){openCAWith(v);document.getElementById('askInput2').value=''}}
+
+function renderSuggs(){
+const list=document.getElementById('caSuggList');list.innerHTML='';
+SUGG_PROMPTS.forEach(s=>{
+const el=document.createElement('div');el.className='ca-sugg';
+el.onclick=()=>{el.classList.add('used');runQuery(s.t)};
+el.innerHTML=`<div class="ca-sugg-arr">→</div><div><div class="ca-sugg-txt">${esc(s.t)}</div><div class="ca-sugg-tag">${esc(s.tag)}</div></div>`;
+list.appendChild(el);
+});
+}
+
+function openCA(){resetCA();document.getElementById('caExp').classList.add('open');setTimeout(()=>document.getElementById('caInput').focus(),80)}
+function openCAWith(text){if(!text||!text.trim())return;openCA();setTimeout(()=>runQuery(text),150)}
+function closeCA(){document.getElementById('caExp').classList.remove('open')}
+
+function resetCA(){
+caRunning=false;
+const msgs=document.getElementById('caMsgs');[...msgs.children].forEach(c=>{if(c.id!=='caIntro')c.remove()});
+document.getElementById('caSuggs').style.display='';
+document.getElementById('caEmpty').style.display='flex';
+document.getElementById('caPipeline').style.display='none';
+document.getElementById('caResHdr').style.display='none';
+document.getElementById('caTblScroll').style.display='none';
+document.getElementById('caSanity').style.display='none';
+document.getElementById('caElapsed').style.display='none';
+document.getElementById('caInput').value='';
+document.getElementById('caTbody').innerHTML='';
+['seed','filter','trigger','score','enrich'].forEach(resetPhase);
+const av=document.querySelector('#caIntro .ca-avatar');
+av.style.background='var(--ac-bg)';av.style.borderColor='var(--ac-border)';av.style.color='var(--accent)';av.textContent='R';
+document.querySelector('.pp-icon').textContent='⚡';
+renderSuggs();
+}
+
+let caRunning=false;
+function caSend(){const v=document.getElementById('caInput').value.trim();if(!v||caRunning)return;document.getElementById('caInput').value='';runQuery(v)}
+function caKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();caSend()}}
+function caGrow(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,110)+'px'}
+function addUserBubble(t){const m=document.getElementById('caMsgs');const d=document.createElement('div');d.className='ca-msg ca-msg-user';d.innerHTML=`<div class="ca-bubble ca-bubble-user">${esc(t)}</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
+function addAgentBubble(h){const m=document.getElementById('caMsgs');const d=document.createElement('div');d.className='ca-msg ca-msg-agent';d.innerHTML=`<div class="ca-avatar">R</div><div class="ca-bubble ca-bubble-agent">${h}</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
+function addThinking(id,txt){const m=document.getElementById('caMsgs');const d=document.createElement('div');d.className='ca-thinking';d.id=id;d.innerHTML=`<div class="ca-dots"><span></span><span></span><span></span></div><div class="ca-think-txt">${txt||'Searching...'}</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
+function updateThinking(id,txt){const el=document.getElementById(id);if(el){const t=el.querySelector('.ca-think-txt');if(t)t.textContent=txt}}
+function removeEl(id){const e=document.getElementById(id);if(e)e.remove()}
+function resetPhase(ph){const el=document.getElementById('ph-'+ph);if(!el)return;el.className='ca-phase';const ico=el.querySelector('.ph-ico,.ca-ph-spin,.ca-ph-ok');if(ico){ico.className='ph-ico';ico.textContent='.';ico.style.fontSize='9px'}}
+function setPhase(ph,status){
+const el=document.getElementById('ph-'+ph);if(!el)return;el.className='ca-phase '+(status||'');
+const ico=el.querySelector('.ph-ico,.ca-ph-spin,.ca-ph-ok');if(!ico)return;
+if(status==='running'){const s=document.createElement('div');s.className='ca-ph-spin';ico.replaceWith(s)}
+else if(status==='done'){const cur=el.querySelector('.ca-ph-spin')||el.querySelector('.ph-ico');if(cur){const ok=document.createElement('span');ok.className='ca-ph-ok';ok.textContent='✓';cur.replaceWith(ok)}}
+}
+function setLog(msg){document.getElementById('caLog').textContent=msg}
+
+const STEPS=[
+{ph:'seed',msgs:['Matching ICP stack criteria across accounts...','Scanning hiring patterns for stack keywords...','Cross-referencing company intel: funding, vertical, size...'],dur:1800},
+{ph:'filter',msgs:['Analyzing team growth trends across 324 matches...','Detecting migration patterns from hiring signals...','Filtering to accounts with active momentum...'],dur:1500},
+{ph:'trigger',msgs:['Scanning for leadership changes in last 90 days...','Detecting project investment from hiring surges...','Flagging accounts with buying trigger events...'],dur:1400},
+{ph:'score',msgs:['Computing stack fitment: overlap with ICP...','Weighting industry vertical and funding stage...','Ranking by composite signal strength...'],dur:1200},
+{ph:'enrich',msgs:['Identifying best contacts by role and seniority...','Generating personalized outreach angles...','Compiling account briefs with signal context...'],dur:1100},
+];
+
+let CURRENT_DATA = [];
+
+async function runQuery(query) {
+if(caRunning)return;caRunning=true;
+document.getElementById('caSuggs').style.display='none';
+document.getElementById('caSendBtn').disabled=true;
+addUserBubble(query);
+document.getElementById('caEmpty').style.display='none';
+document.getElementById('caPipeline').style.display='block';
+
+const isPub = window.IS_PUBLIC;
+const apiURL = isPub ? '/api/public-ask' : '/api/ask';
+const phaseList = isPub ? ['parse','search','extract','icp','rank'] : ['seed','filter','trigger','score','enrich'];
+
+if(isPub) {
+  document.querySelector('.ca-phases').innerHTML = `
+<div class="ca-phase" id="ph-parse"><span class="ph-ico" style="font-size:9px">.</span> Parse</div>
+<div class="ca-phase" id="ph-search"><span class="ph-ico" style="font-size:9px">.</span> Search</div>
+<div class="ca-phase" id="ph-extract"><span class="ph-ico" style="font-size:9px">.</span> Extract</div>
+<div class="ca-phase" id="ph-icp"><span class="ph-ico" style="font-size:9px">.</span> Match</div>
+<div class="ca-phase" id="ph-rank"><span class="ph-ico" style="font-size:9px">.</span> Rank</div>`;
+} else {
+  document.querySelector('.ca-phases').innerHTML = `
+<div class="ca-phase" id="ph-seed"><span class="ph-ico" style="font-size:9px">.</span> Seed</div>
+<div class="ca-phase" id="ph-filter"><span class="ph-ico" style="font-size:9px">.</span> Intent</div>
+<div class="ca-phase" id="ph-trigger"><span class="ph-ico" style="font-size:9px">.</span> Trigger</div>
+<div class="ca-phase" id="ph-score"><span class="ph-ico" style="font-size:9px">.</span> Score</div>
+<div class="ca-phase" id="ph-enrich"><span class="ph-ico" style="font-size:9px">.</span> Enrich</div>`;
+}
+
+phaseList.forEach(resetPhase);
+setLog('Initializing pipeline...');
+addThinking('caThink','Connecting to server...');
+const t0=Date.now();
+let results = [];
+
+try {
+const response = await fetch(apiURL, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ question: query })
+});
+if(!response.ok) throw new Error('API Error');
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+let buffer = '';
+while(true) {
+const { done, value } = await reader.read();
+if(done) break;
+buffer += decoder.decode(value, { stream: true });
+let boundary = buffer.indexOf('\n\n');
+while(boundary !== -1) {
+const chunk = buffer.substring(0, boundary);
+buffer = buffer.substring(boundary + 2);
+const lines = chunk.split('\n');
+let eventType = 'message', data = null;
+for(const line of lines) {
+if(line.startsWith('event: ')) eventType = line.substring(7);
+else if(line.startsWith('data: ')) data = JSON.parse(line.substring(6));
+}
+if(data) {
+if(eventType==='start'){setLog(data.msg);updateThinking('caThink',data.msg);}
+else if(eventType==='phase'){setPhase(data.phase,data.status);setLog(data.msg);updateThinking('caThink',data.msg);}
+else if(eventType==='done'){
+results = data.results || [];
+CURRENT_DATA = results;
+removeEl('caThink');
+const elapsed=((Date.now()-t0)/1000).toFixed(1);
+document.getElementById('caElapsed').textContent=elapsed+'s';document.getElementById('caElapsed').style.display='inline';
+renderResults(results,query);
+const hi=results.filter(r=>r.score>=80).length,trig=results.filter(r=>r.sigs.includes('senior_hire')||r.sigs.includes('tech_migration')).length;
+addAgentBubble(`<div class="ca-aname">Signal agent</div>
+<p>Built <strong>${results.length} high-fit accounts</strong> in ${elapsed}s across 5 signal layers.</p>
+<p style="margin-top:5px;font-size:12px"><strong>${hi}</strong> scored 80+ · <strong>${trig}</strong> with buying triggers · All enriched with contacts + angles.</p>
+<p style="margin-top:7px;font-size:11px;color:var(--muted)">Data powered by Reo backend. Export to CRM above.</p>`);
+}
+}
+boundary = buffer.indexOf('\n\n');
+}
+}
+} catch(e) {
+console.error(e);
+setLog('Error: ' + e.message);
+removeEl('caThink');
+}
+
+caRunning=false;document.getElementById('caSendBtn').disabled=false;
+}
+
+function renderResults(data,query){
+document.getElementById('caResHdr').style.display='flex';
+document.getElementById('caResCount').textContent=data.length+' accounts · '+data.reduce((a,r)=>a+r.sigs.length,0)+' signals';
+document.getElementById('caResMeta').textContent='· '+(query||'').slice(0,40)+(query&&query.length>40?'...':'');
+renderTable(data);
+const san=document.getElementById('caSanity');san.style.display='flex';
+const hi=data.filter(r=>r.score>=80).length,md=data.filter(r=>r.score>=70&&r.score<80).length;
+san.innerHTML=`<div style="display:flex;align-items:center;gap:5px"><span class="san-dot san-ok"></span>${hi} score ≥80</div><div style="display:flex;align-items:center;gap:5px"><span class="san-dot san-md"></span>${md} score 70-79</div><div style="display:flex;align-items:center;gap:5px"><span class="san-dot san-info"></span>5 signal layers</div><div style="margin-left:auto;display:flex;align-items:center;gap:5px"><span class="san-dot san-info"></span>0 OSS signals</div>`;
+}
+
+function applyF(f,btn){
+document.querySelectorAll('.ca-filter').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');
+let d=[...CURRENT_DATA];
+if(f==='hi')d=d.filter(r=>r.score>=80);else if(f==='trigger')d=d.filter(r=>r.sigs.includes('senior_hire')||r.sigs.includes('tech_project')||r.sigs.includes('competitive_eval'));else if(f==='migr')d=d.filter(r=>r.sigs.includes('tech_migration'));
+renderTable(d);
+document.getElementById('caResCount').textContent=d.length+' accounts · '+d.reduce((a,r)=>a+r.sigs.length,0)+' signals'+(f!=='all'?' · filtered':'');
+}
+
+const SIG_MAP={tech_shop:['Stack match','sig-tech'],tech_scaling:['Scaling','sig-scale'],tech_hiring:['Hiring','sig-hire'],tech_migration:['Migration','sig-migr'],senior_hire:['New exec','sig-exec'],tech_project:['Tech project','sig-proj'],team_scaling:['Team growth','sig-scale'],headcount_fit:['Size fit','sig-hire'],competitive_eval:['Competitor','sig-migr']};
+const SRC_MAP={'Stack detection':'src-tech','Hiring intent':'src-job','Leadership change':'src-li','Company intel':'src-org','Team growth':'src-job','Dev activity':'src-act','Migration detection':'src-act'};
+
+function renderTable(data){
+const tb=document.getElementById('caTbody');tb.innerHTML='';
+if(!data.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--faint)">No results match this filter.</td></tr>';document.getElementById('caTblScroll').style.display='block';return}
+data.forEach(r=>{
+const tr=document.createElement('tr');
+const scCls=r.score>=80?'sc-hi':r.score>=70?'sc-md':'sc-lo';
+const sigs=r.sigs.map(s=>{const[l,c]=SIG_MAP[s]||[s,'sig-tech'];return`<span class="sig-badge ${c}">${esc(l)}</span>`}).join('');
+const srcs=r.sources.map(s=>`<span class="src-badge ${SRC_MAP[s]||'src-tech'}">${esc(s)}</span>`).join(' ');
+const ini=r.contact.split(' ').map(w=>w[0]).join('');
+tr.innerHTML=`<td><div class="co-wrap"><img src="https://www.google.com/s2/favicons?domain=${r.dom}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-fav"><div><div class="co-name">${esc(r.name)}</div><div class="co-dom">${esc(r.dom)}</div></div></div></td>
+<td><div style="display:flex;flex-wrap:wrap;gap:2px;max-width:160px">${sigs}</div></td>
+<td><span class="sc-pill ${scCls}">${r.score}</span></td>
+<td><div style="font-size:10.5px;color:var(--muted);line-height:1.5;max-width:200px">${esc(r.insight)}</div></td>
+<td><div class="person-card"><div class="person-av">${ini}</div><div class="person-info"><div class="person-name">${esc(r.contact)}</div><div class="person-title">${esc(r.ctitle)}<br><span style="color:var(--accent)">${esc(r.cstart)}</span></div></div></div></td>
+<td><div class="angle-txt">${esc(r.angle)}</div></td>
+<td><div style="display:flex;flex-direction:column;gap:3px">${srcs}</div></td>`;
+tb.appendChild(tr);
+});
+document.getElementById('caTblScroll').style.display='block';
+}
+
+function dlCSV(){
+const hdrs=['Account','Domain','Score','Signals','Insight','Contact','Title','Outreach Angle','Sources'];
+const rows=(CURRENT_DATA.length ? CURRENT_DATA : MOCK_DATA.slice(0,10)).map(r=>[r.name,r.dom,r.score,r.sigs.join('; '),r.insight,r.contact,r.ctitle,r.angle,r.sources.join('; ')]);
+const csv=[hdrs,...rows].map(row=>row.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+a.download=`reo-revops-${new Date().toISOString().slice(0,10)}.csv`;
+document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+
+buildPlaybooks();buildFeed();renderSuggs();
+</script>
+</body></html>

@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Reo.Dev — Public Search Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f5f3;--border:#e5e5e3;--border-dk:#c5c5c0;--text:#111;--muted:#666;--faint:#999;
+  --accent:#5b21b6;--ac-bg:#ede9fe;--ac-border:#c4b5fd;
+  --green-bg:#f0fdf4;--green-bd:#86efac;--amber-bg:#fffbeb;--amber-bd:#fcd34d;
+  --mono:'DM Mono',monospace;--sans:'Space Grotesk',sans-serif;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;font-size:13px}
+
+/* ── SIDEBAR ── */
+.sb{width:162px;min-width:162px;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column}
+.sb-brand{padding:13px 12px 10px;font-size:14px;font-weight:700;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px}
+.sb-nav{flex:1;overflow-y:auto;padding:7px 5px}
+.ni{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:5px;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:none;transition:background .12s}
+.ni:hover{background:#f0f0ee;color:var(--text)}
+.ni.active{background:var(--ac-bg);color:var(--accent);font-weight:500}
+.ni svg{width:12px;height:12px;flex-shrink:0}
+.ns{font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--faint);text-transform:uppercase;padding:9px 8px 2px}
+.sb-foot{border-top:1px solid var(--border);padding:7px 5px}
+.u-row{display:flex;align-items:center;gap:7px;padding:5px 8px;font-size:11.5px;color:var(--muted)}
+.av{width:20px;height:20px;border-radius:50%;background:#ddd;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;color:#555}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.mhdr{background:#fff;border-bottom:1px solid var(--border);padding:0 22px}
+.htop{display:flex;align-items:center;padding:12px 0 8px}
+.mt{font-size:15.5px;font-weight:600}
+.tabs{display:flex}
+.tab{padding:7px 13px;font-size:12.5px;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap}
+.tab.active{border-bottom-color:var(--accent);color:var(--accent);font-weight:500}
+.mcpbadge{font-family:var(--mono);font-size:9px;background:var(--accent);color:#fff;padding:1px 5px;border-radius:3px}
+.custbadge{font-family:var(--mono);font-size:9px;background:#059669;color:#fff;padding:1px 5px;border-radius:3px}
+
+/* ── CONTENT ── */
+.content{flex:1;overflow-y:auto;padding:20px 22px 48px}
+.cintro{margin-bottom:20px}
+.cintro h2{font-size:19px;font-weight:600;color:var(--accent);margin-bottom:3px}
+.cintro p{font-size:11.5px;color:var(--muted)}
+.fsec{margin-bottom:26px}
+.fhdr{display:flex;align-items:center;gap:7px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.fdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.fdot.lb{background:#a78bfa}.fdot.cu{background:#059669}
+.ftitle{font-size:12.5px;font-weight:600}
+.fsub{font-size:11px;color:var(--faint);margin-left:1px}
+.fcnt{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--faint)}
+.agrid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+
+/* ── CARDS ── */
+.acard{background:#fff;border:1px solid var(--border);border-radius:7px;padding:13px 12px 11px;cursor:pointer;transition:box-shadow .15s,border-color .15s;display:flex;flex-direction:column;gap:5px;position:relative}
+.acard:hover{box-shadow:0 2px 10px rgba(0,0,0,.07);border-color:var(--border-dk)}
+.acard:hover .btry{background:var(--ac-bg);border-color:var(--ac-border);color:var(--accent)}
+.acard.custom-card{border:1.5px dashed #34d399;background:linear-gradient(135deg,#f0fdf4 0%,#fff 100%)}
+.acard.custom-card:hover{border-color:#059669;border-style:solid;box-shadow:0 2px 14px rgba(5,150,105,.12)}
+.acard.custom-card:hover .btry{background:var(--green-bg);border-color:var(--green-bd);color:#059669}
+.ppip{position:absolute;top:9px;right:9px;width:5px;height:5px;border-radius:50%;background:#34d399}
+.ppip.p1{background:#a78bfa}
+.cico{width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px}
+.cico.lb{background:#faf5ff;border:1px solid var(--ac-border)}
+.cico.cu{background:var(--green-bg);border:1px solid var(--green-bd)}
+.cname{font-size:12px;font-weight:600;line-height:1.2;padding-right:14px}
+.cdesc{font-size:10.5px;color:var(--muted);line-height:1.4;flex:1}
+.csig{font-family:var(--mono);font-size:9px;color:var(--faint);display:flex;align-items:center;gap:3px;margin-top:1px}
+.sdot{width:4px;height:4px;border-radius:50%;background:var(--faint);flex-shrink:0}
+.btry{margin-top:3px;font-family:var(--sans);font-size:10.5px;border:1px solid var(--border);background:#fff;color:var(--muted);padding:4px 9px;border-radius:4px;cursor:pointer;transition:all .12s;width:fit-content}
+
+/* ═══════════════════════════════════════
+   AGENT FULL-SCREEN
+═══════════════════════════════════════ */
+.ca-exp{display:none;position:fixed;inset:0;z-index:300;background:var(--bg);flex-direction:column}
+.ca-exp.open{display:flex}
+.ca-layout{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* topbar */
+.ca-topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;height:46px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.ca-back{background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:var(--sans);font-size:12px;color:var(--muted);padding:4px 7px;border-radius:4px;transition:background .12s}
+.ca-back:hover{background:#f0f0ee;color:var(--text)}
+.ca-sep{width:1px;height:18px;background:var(--border)}
+.ca-label{display:flex;align-items:center;gap:7px}
+.ca-agent-name{font-size:13px;font-weight:600}
+.ca-done-btn{font-family:var(--sans);font-size:12px;padding:5px 14px;border:1.5px solid #111;border-radius:5px;background:#111;color:#fff;cursor:pointer;font-weight:500;transition:background .12s}
+.ca-done-btn:hover{background:var(--accent);border-color:var(--accent)}
+
+/* body */
+.ca-body{display:flex;flex:1;overflow:hidden;min-height:0}
+
+/* ── CHAT ── */
+.ca-chat{width:40%;min-width:340px;display:flex;flex-direction:column;background:#fff;border-right:1px solid var(--border);overflow:hidden;flex-shrink:0}
+.ca-msgs{flex:1;overflow-y:auto;padding:28px 7% 16px;display:flex;flex-direction:column;gap:16px}
+.ca-msg{display:flex;align-items:flex-start;gap:10px}
+.ca-msg-agent{justify-content:flex-start}
+.ca-msg-user{justify-content:flex-end}
+.ca-avatar{width:27px;height:27px;border-radius:50%;background:var(--green-bg);border:1px solid var(--green-bd);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#059669;font-size:11px;margin-top:2px}
+.ca-bubble{max-width:520px;border-radius:12px;padding:11px 15px;font-size:13px;line-height:1.65}
+.ca-bubble-agent{background:#f5f5f3;border-radius:3px 12px 12px 12px;color:var(--text)}
+.ca-bubble-user{background:#111;border-radius:12px 3px 12px 12px;color:#fff;max-width:420px}
+.ca-aname{font-family:var(--mono);font-size:9px;color:#059669;letter-spacing:.05em;margin-bottom:5px;text-transform:uppercase}
+
+/* suggestions */
+.ca-suggs{padding-left:37px;max-width:540px;margin-top:4px}
+.ca-sugg-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin-bottom:6px}
+.ca-sugg-list{display:flex;flex-direction:column;gap:5px}
+.ca-sugg{border:1px solid var(--border);border-radius:8px;padding:9px 12px;cursor:pointer;background:#fafaf9;transition:border-color .15s,background .15s;display:flex;gap:8px}
+.ca-sugg:hover{border-color:#86efac;background:var(--green-bg)}
+.ca-sugg.used{opacity:.38;pointer-events:none}
+.ca-sugg-arr{font-size:10px;color:#86efac;flex-shrink:0;margin-top:2px}
+.ca-sugg-txt{font-size:11.5px;color:var(--text);line-height:1.35;font-weight:500}
+.ca-sugg-tag{font-family:var(--mono);font-size:9px;color:var(--faint);margin-top:2px}
+
+/* thinking */
+.ca-thinking{display:flex;align-items:center;gap:8px;padding-left:37px}
+.ca-dots{display:flex;gap:4px}
+.ca-dots span{width:6px;height:6px;border-radius:50%;background:#86efac;animation:tdp 1.4s ease-in-out infinite}
+.ca-dots span:nth-child(2){animation-delay:.2s}
+.ca-dots span:nth-child(3){animation-delay:.4s}
+@keyframes tdp{0%,80%,100%{transform:scale(.6);background:#d1fae5}40%{transform:scale(1);background:#059669}}
+.ca-think-txt{font-size:11.5px;color:var(--muted);font-style:italic}
+
+/* input */
+.ca-input-area{border-top:1px solid var(--border);padding:13px 7% 15px;background:#fff;flex-shrink:0}
+.ca-input-wrap{display:flex;align-items:flex-end;gap:8px;border:1.5px solid var(--border-dk);border-radius:10px;padding:10px 12px;background:#fafaf9;transition:border-color .15s,background .15s;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.ca-input-wrap:focus-within{border-color:#059669;background:#fff;box-shadow:0 0 0 3px #d1fae5}
+.ca-textarea{flex:1;border:none;outline:none;font-family:var(--sans);font-size:13px;color:var(--text);background:transparent;resize:none;line-height:1.5;max-height:110px;overflow-y:auto}
+.ca-textarea::placeholder{color:var(--faint)}
+.ca-send{background:#059669;border:none;border-radius:7px;color:#fff;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background .1s}
+.ca-send:hover{background:#047857}
+.ca-send:disabled{opacity:.4;cursor:not-allowed}
+.ca-hint{font-family:var(--mono);font-size:8.5px;color:var(--faint);margin-top:5px;text-align:center}
+
+/* ── RESULTS PANEL ── */
+.ca-results{flex:1;display:flex;flex-direction:column;overflow:hidden;background:#fafaf9;min-width:0}
+
+/* empty */
+.ca-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--faint);padding:48px;text-align:center}
+.ca-empty p{font-size:11.5px;line-height:1.7;max-width:260px}
+
+/* pipeline strip */
+.ca-pipeline{background:#fff;border-bottom:1px solid var(--border);padding:9px 14px 7px;flex-shrink:0;display:none}
+.ca-phases{display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;margin-bottom:6px}
+.ca-phase{flex:1;padding:5px 8px;border-right:1px solid var(--border);display:flex;align-items:center;gap:5px;font-size:10px;color:var(--faint);transition:background .15s}
+.ca-phase:last-child{border-right:none}
+.ca-phase.running{background:rgba(5,150,105,.06);color:#059669}
+.ca-phase.done{background:rgba(5,150,105,.04);color:#059669}
+.ca-ph-spin{width:9px;height:9px;border:1.5px solid #059669;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ca-ph-ok{color:#059669;font-size:10px;flex-shrink:0;font-weight:700}
+.ca-log{font-family:var(--mono);font-size:9px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* results header */
+.ca-res-hdr{background:#fff;border-bottom:1px solid var(--border);padding:9px 14px;display:none;align-items:center;justify-content:space-between;flex-shrink:0}
+.ca-res-title{font-size:11.5px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px}
+.ca-res-meta{font-family:var(--mono);font-size:9px;color:var(--faint)}
+.ca-dl-btn{font-family:var(--sans);font-size:10.5px;padding:4px 10px;border:1px solid var(--green-bd);border-radius:4px;background:var(--green-bg);color:#059669;cursor:pointer;display:flex;align-items:center;gap:4px;font-weight:500;transition:all .12s}
+.ca-dl-btn:hover{background:#dcfce7}
+.ca-dl-btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* table scroll */
+.ca-tbl-scroll{flex:1;overflow:auto}
+
+/* table */
+.ca-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.ca-tbl th{padding:7px 12px;text-align:left;font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);background:#fafaf9;font-family:var(--mono);position:sticky;top:0;z-index:1;white-space:nowrap}
+.ca-tbl td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;white-space:normal}
+.ca-tbl tr:last-child td{border-bottom:none}
+.ca-tbl tbody tr:hover td{background:#f5f0ff}
+
+/* company cell */
+.co-wrap{display:flex;align-items:flex-start;gap:7px;min-width:120px}
+.co-fav{width:16px;height:16px;border-radius:3px;flex-shrink:0;margin-top:2px;object-fit:contain}
+.co-name{font-weight:600;font-size:11.5px;color:var(--text);line-height:1.2}
+.co-dom{font-family:var(--mono);font-size:9px;color:var(--accent);margin-top:2px;user-select:all;cursor:pointer}
+.co-dom:hover{text-decoration:underline}
+
+/* content type badge */
+.ct-badge{display:inline-block;font-family:var(--mono);font-size:8.5px;padding:2px 7px;border-radius:3px;font-weight:500;white-space:nowrap}
+.ct-blog{background:#ede9fe;color:#5b21b6;border:1px solid var(--ac-border)}
+.ct-ann{background:#ecfdf5;color:#059669;border:1px solid var(--green-bd)}
+.ct-wp{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ct-cs{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
+.ct-guide{background:#fdf4ff;color:#7e22ce;border:1px solid #e9d5ff}
+.ct-doc{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
+.ct-other{background:#f9fafb;color:var(--muted);border:1px solid var(--border)}
+
+/* score pill */
+.sc-pill{display:inline-block;font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:3px;font-weight:600}
+.sc-hi{background:#f0fdf4;color:#059669;border:1px solid #86efac}
+.sc-md{background:#fffbeb;color:#d97706;border:1px solid var(--amber-bd)}
+.sc-lo{background:#fef2f2;color:#dc2626;border:1px solid #fca5a5}
+
+/* excerpt */
+.sig-txt{font-size:10.5px;color:var(--muted);line-height:1.55;min-width:320px;max-width:420px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+
+/* date */
+.date-main{font-family:var(--mono);font-size:10px;color:var(--text);white-space:nowrap}
+.date-rec{font-family:var(--mono);font-size:8px;margin-top:3px;display:inline-block;padding:1px 5px;border-radius:2px;white-space:nowrap}
+.rec-fresh{background:#f0fdf4;color:#059669}
+.rec-ok{background:#f0fdf4;color:#059669}
+.rec-warn{background:#fffbeb;color:#d97706}
+.rec-old{background:#f9fafb;color:var(--muted)}
+.rec-unknown{background:#f9fafb;color:var(--faint)}
+
+/* proof url */
+.proof-url{font-family:var(--mono);font-size:9px;color:var(--accent);background:var(--ac-bg);border:1px solid var(--ac-border);padding:3px 8px;border-radius:3px;display:block;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;user-select:all;transition:background .12s}
+.proof-url:hover{background:#ddd6fe}
+
+/* next-step action pills */
+.ns-cell{display:flex;flex-direction:column;gap:5px;min-width:160px;max-width:190px}
+.ns-pill{font-family:var(--sans);font-size:10px;font-weight:500;padding:3px 7px;border-radius:4px;display:inline-flex;align-items:center;gap:4px;line-height:1.35}
+.ns-hire    {background:#f0fdf4;color:#15803d;border:1px solid #86efac}
+.ns-displace{background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe}
+.ns-fund    {background:#fffbeb;color:#b45309;border:1px solid #fcd34d}
+.ns-launch  {background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd}
+.ns-scale   {background:#ecfdf5;color:#059669;border:1px solid #6ee7b7}
+.ns-pain    {background:#fff1f2;color:#be123c;border:1px solid #fda4af}
+.ns-content {background:#f8fafc;color:#475569;border:1px solid #cbd5e1}
+.ns-default {background:#f8fafc;color:#64748b;border:1px solid #e2e8f0}
+/* agent suggestion tags inside next-step cell */
+.ns-agents{display:flex;flex-wrap:wrap;gap:3px;margin-top:1px}
+.ns-agent{font-family:var(--mono);font-size:8px;padding:1px 5px;border-radius:3px;background:var(--ac-bg);color:var(--accent);border:1px solid var(--ac-border);white-space:nowrap;cursor:default}
+.ns-agent:hover{background:#ddd6fe}
+
+/* source badge */
+.src-badge{font-family:var(--mono);font-size:8.5px;padding:2px 6px;border-radius:3px;display:inline-block;white-space:nowrap}
+.src-exa{background:#ede9fe;color:#5b21b6;border:1px solid var(--ac-border)}
+.src-pai{background:#ecfdf5;color:#059669;border:1px solid var(--green-bd)}
+.src-fc{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
+.src-sec{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.src-tav{background:#fdf4ff;color:#a21caf;border:1px solid #e879f9}
+
+/* date filter pills */
+.ca-filters{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.ca-filter{font-family:var(--mono);font-size:9px;padding:3px 9px;border-radius:12px;border:1px solid var(--border);background:#fff;color:var(--muted);cursor:pointer;transition:all .12s;white-space:nowrap}
+.ca-filter:hover{border-color:var(--border-dk);color:var(--text)}
+.ca-filter.active{background:var(--ac-bg);border-color:var(--ac-border);color:var(--accent);font-weight:500}
+.ca-filter-lbl{font-family:var(--mono);font-size:9px;color:var(--faint);margin-right:2px}
+
+/* page-size pills in table footer */
+.pg-pill{font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);background:#fff;color:var(--muted);cursor:pointer;transition:all .12s}
+.pg-pill:hover{border-color:var(--border-dk);color:var(--text)}
+.pg-pill.active{background:var(--ac-bg);border-color:var(--ac-border);color:var(--accent);font-weight:600}
+
+/* unverified date badge */
+.date-unverified-badge{display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:8px;padding:2px 6px;border-radius:3px;background:#fff8f0;border:1px solid #fed7aa;color:#c2410c;white-space:nowrap;margin-top:3px}
+
+/* sanity bar */
+.ca-sanity{padding:8px 14px;border-top:1px solid var(--border);background:#fff;display:none;align-items:center;gap:16px;flex-shrink:0;font-family:var(--mono);font-size:9px;color:var(--faint);flex-wrap:wrap}
+.san-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;display:inline-block}
+.san-ok{background:#059669}.san-md{background:#d97706}.san-lo{background:#dc2626}.san-info{background:#6366f1}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sb">
+  <div class="sb-brand">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5.5" height="5.5" rx="1.2"/><rect x="9.5" y="1" width="5.5" height="5.5" rx="1.2"/><rect x="1" y="9.5" width="5.5" height="5.5" rx="1.2"/><rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1.2"/></svg>
+    Reo.Dev
+  </div>
+  <nav class="sb-nav">
+    <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>Accounts</a>
+    <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg>Developers</a>
+    <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><path d="M5.5 8h5M8 5.5v5"/></svg>Segments</a>
+    <a class="ni active" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l3 3 7-7"/></svg>Agents</a>
+    <div class="ns">Tools</div>
+    <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12v8H2z"/></svg>Lists</a>
+    <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12V6l6-4 6 4v6"/><rect x="6" y="9" width="4" height="3"/></svg>Campaigns</a>
+  </nav>
+  <div class="sb-foot">
+    <div class="u-row"><div class="av">SP</div>Sumedh P</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="mhdr">
+    <div class="htop"><div class="mt">Agents</div></div>
+    <div class="tabs">
+      <div class="tab" onclick="switchTab('library',this)">Reo agent library</div>
+      <div class="tab active" onclick="switchTab('reon',this)">
+        Reon Agents <span class="mcpbadge">MCP</span>
+      </div>
+      <div class="tab" onclick="switchTab('configured',this)">Configured agents</div>
+    </div>
+  </div>
+
+  <!-- REON TAB -->
+  <div class="content" id="reon-content">
+    <div class="cintro">
+      <h2>Build a list using public signals</h2>
+      <p>Public Data Agent — real-time scraping via Exa, Firecrawl, and Parallel AI. No internal data.</p>
+    </div>
+
+    <div class="fsec">
+      <div class="fhdr">
+        <div class="fdot cu"></div>
+        <div class="ftitle">Custom Agent</div>
+        <div class="fsub">— ask anything, get a sourced list in real-time</div>
+        <span class="fcnt">live · Exa + Firecrawl + Parallel AI</span>
+      </div>
+      <div style="max-width:300px">
+        <div class="acard custom-card" onclick="openCA()">
+          <div class="ppip"></div>
+          <div class="cico cu">🔍</div>
+          <div class="cname">SDR Intelligence Agent</div>
+          <div class="cdesc">Find closed-source readiness signals — funding, pain content, blogs, tech migration, and product launches scraped in real-time from company websites.</div>
+          <div class="csig"><span class="sdot" style="background:#34d399"></span>Trigger Events · Pain Signals · Build vs Buy</div>
+          <button class="btry">Open agent →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="fsec">
+      <div class="fhdr"><div class="fdot lb"></div><div class="ftitle">Signal Shortcuts</div><div class="fsub">— quick-launch SDR templates</div><span class="fcnt">4 categories</span></div>
+      <div class="agrid">
+        <div class="acard" onclick="openCAWith(SUGGS[0].t)"><div class="ppip p1"></div><div class="cico lb">🚨</div><div class="cname">Trigger Events</div><div class="cdesc">New exec hire, post-funding GTM content, market expansion.</div><div class="csig"><span class="sdot"></span>Series A/B · Launch</div><button class="btry">Try →</button></div>
+        <div class="acard" onclick="openCAWith(SUGGS[3].t)"><div class="ppip p1"></div><div class="cico lb">😰</div><div class="cname">Pain Signals</div><div class="cdesc">Churn, onboarding friction, CS infrastructure pain publicly documented.</div><div class="csig"><span class="sdot"></span>Blog · Content</div><button class="btry">Try →</button></div>
+        <div class="acard" onclick="openCAWith(SUGGS[6].t)"><div class="ppip p1"></div><div class="cico lb">🏗️</div><div class="cname">Build vs Buy</div><div class="cdesc">Eng teams building what you sell — strong near-buy signal.</div><div class="csig"><span class="sdot"></span>Engineering posts</div><button class="btry">Try →</button></div>
+        <div class="acard" onclick="openCAWith(SUGGS[12].t)"><div class="ppip p1"></div><div class="cico lb">🤖</div><div class="cname">AI Adoption</div><div class="cdesc">AI-powered CS, automated QBRs, agent-based onboarding signals.</div><div class="csig"><span class="sdot"></span>AI · Agentic</div><button class="btry">Try →</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content" id="library-content" style="display:none">
+    <div class="cintro"><h2 style="color:var(--accent)">Reo Agent Library</h2><p>Pre-built templates coming soon.</p></div>
+  </div>
+  <div class="content" id="configured-content" style="display:none">
+    <div style="text-align:center;color:var(--faint);padding:80px;font-size:13px">15 SDR signal prompts configured</div>
+  </div>
+</main>
+
+<!-- AGENT FULL-SCREEN -->
+<div class="ca-exp" id="caExp">
+<div class="ca-layout">
+
+  <div class="ca-topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="ca-back" onclick="closeCA()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12"><path d="M10 3L5 8l5 5"/></svg>
+        Agents
+      </button>
+      <div class="ca-sep"></div>
+      <div class="ca-label">
+        <span style="font-size:14px">🔍</span>
+        <span class="ca-agent-name">SDR Intelligence Agent</span>
+        <span class="custbadge">Public Data</span>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--faint);margin-left:4px">· Exa + Firecrawl + Parallel AI</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="caElapsed" style="font-family:var(--mono);font-size:9px;color:var(--faint);display:none"></span>
+      <button class="ca-done-btn" onclick="closeCA()">Done</button>
+    </div>
+  </div>
+
+  <div class="ca-body">
+
+    <!-- CHAT -->
+    <div class="ca-chat">
+      <div class="ca-msgs" id="caMsgs">
+        <div class="ca-msg ca-msg-agent" id="caIntro">
+          <div class="ca-avatar">✦</div>
+          <div>
+            <div class="ca-bubble ca-bubble-agent">
+              <div class="ca-aname">SDR Intelligence Agent</div>
+              <p>Tell me what your prospects are doing — I'll scan their blogs, announcements, and changelogs in real-time and surface the exact moment they're ready to buy. Every result comes with a confidence score, a direct proof link, and the signal that triggered it.</p>
+              <p style="margin-top:7px;font-size:11px;color:var(--muted)">Ask about funding signals, pain content, build-vs-buy moments, AI adoption, or competitive displacement.</p>
+            </div>
+            <div class="ca-suggs" id="caSuggs">
+              <div class="ca-sugg-lbl" style="margin-bottom:6px">SDR signal prompts</div>
+              <div class="ca-sugg-list" id="caSuggList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ca-input-area">
+        <div class="ca-input-wrap">
+          <textarea class="ca-textarea" id="caInput" rows="1"
+            placeholder="e.g. Series A SaaS companies writing about customer churn in the last 6 months…"
+            oninput="caGrow(this)" onkeydown="caKey(event)"></textarea>
+          <button class="ca-send" id="caSendBtn" onclick="caSend()">
+            <svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2" width="11" height="11"><path d="M13 8H3M9 4l4 4-4 4"/></svg>
+          </button>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:5px">
+          <div class="ca-hint" style="margin-top:0">Enter to send · Shift+Enter for newline · results stream live on the right</div>
+          <div id="costPreview" style="display:none;font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:10px;background:#fffbeb;border:1px solid #fcd34d;color:#92400e;white-space:nowrap"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="ca-results" id="caResultsPanel">
+
+      <div class="ca-empty" id="caEmpty">
+        <div style="font-size:32px;opacity:.18">⬛</div>
+        <p>Results appear here as the agent runs — with proof links, confidence scores, publish dates, and the exact tool that surfaced each signal.</p>
+      </div>
+
+      <div class="ca-pipeline" id="caPipeline">
+        <div class="ca-phases">
+          <div class="ca-phase" id="ph-query">  <span class="ph-ico">·</span> Query</div>
+          <div class="ca-phase" id="ph-search"> <span class="ph-ico">·</span> Search</div>
+          <div class="ca-phase" id="ph-scrape"> <span class="ph-ico">·</span> Scrape</div>
+          <div class="ca-phase" id="ph-extract"><span class="ph-ico">·</span> Extract</div>
+          <div class="ca-phase" id="ph-score">  <span class="ph-ico">·</span> Synthesize</div>
+        </div>
+        <div class="ca-log" id="caLog">Waiting…</div>
+      </div>
+
+      <div class="ca-res-hdr" id="caResHdr">
+        <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:0">
+          <div class="ca-res-title">
+            <span id="caResCount">Results</span>
+            <span class="ca-res-meta" id="caResMeta"></span>
+            <span id="caUnverifiedBadge" style="display:none;font-family:var(--mono);font-size:8.5px;background:#fff8f0;border:1px solid #fed7aa;color:#c2410c;padding:1px 7px;border-radius:3px;margin-left:4px"></span>
+          </div>
+          <div class="ca-filters">
+            <span class="ca-filter-lbl">Show:</span>
+            <button class="ca-filter" onclick="applyFilter('all',this)">All results</button>
+            <button class="ca-filter active" onclick="applyFilter('strong50',this)">Score ≥50%</button>
+            <button class="ca-filter" onclick="applyFilter('verified',this)">Verified dates only</button>
+            <button class="ca-filter" onclick="applyFilter('90d',this)">Last 90 days</button>
+            <button class="ca-filter" onclick="applyFilter('30d',this)">Last 30 days</button>
+            <button class="ca-filter" onclick="applyFilter('strong',this)">Score ≥70%</button>
+          </div>
+        </div>
+        <button class="ca-dl-btn" id="caDlBtn" onclick="caDownload()" disabled style="flex-shrink:0;align-self:flex-start">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="10" height="10"><path d="M4 13h8M8 3v7M5 7l3 3 3-3"/></svg>
+          Download CSV
+        </button>
+      </div>
+
+      <div class="ca-tbl-scroll" id="caTblScroll" style="display:none">
+        <table class="ca-tbl">
+          <thead><tr>
+            <th>Company</th>
+            <th>Domain</th>
+            <th>Source / Blog</th>
+            <th>Type</th>
+            <th>Signal matched</th>
+            <th>Score</th>
+            <th>Published</th>
+            <th>Proof URL</th>
+            <th>Via</th>
+            <th>Next Step + Agent</th>
+          </tr></thead>
+          <tbody id="caTbody"></tbody>
+        </table>
+        <!-- Page-size selector row -->
+        <div id="caLoadMore" style="display:none;padding:11px 16px;border-top:1px solid var(--border);background:#fff;display:flex;align-items:center;gap:8px">
+          <span style="font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.06em">SHOW</span>
+          <div style="display:flex;gap:4px">
+            <button class="pg-pill active" data-n="10"  onclick="setPageSize(10,this)">10</button>
+            <button class="pg-pill"        data-n="25"  onclick="setPageSize(25,this)">25</button>
+            <button class="pg-pill"        data-n="50"  onclick="setPageSize(50,this)">50</button>
+            <button class="pg-pill"        data-n="100" onclick="setPageSize(100,this)">100</button>
+            <button class="pg-pill"        data-n="0"   onclick="setPageSize(0,this)">All</button>
+          </div>
+          <span id="caLoadMoreSub" style="font-family:var(--mono);font-size:9px;color:var(--faint);margin-left:4px"></span>
+        </div>
+      </div>
+
+      <div class="ca-sanity" id="caSanity"></div>
+
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+// Build the API base explicitly from protocol + host (includes port).
+// window.location.origin can return "" in some WebViews/OS contexts, which
+// would silently reduce the URL back to a relative path and cause a parse error.
+const _apiBase = location.protocol + '//' + location.host;
+const API = _apiBase + '/api/ask';
+
+const SUGGS = [
+  {t:'Which B2B SaaS companies have announced a new VP of Customer Success or Head of Post-Sales in the last 90 days based on blogs or press releases?', tag:'🚨 Trigger · New decision maker'},
+  {t:'Find companies that raised a Series B or Series C in the last 6 months AND published content about scaling their customer success or revenue operations team', tag:'🚨 Trigger · Funding + GTM signal'},
+  {t:'Which SaaS companies published blogs about expanding into a new market or launching a new product line in the last 90 days — indicating new onboarding infrastructure needs', tag:'🚨 Trigger · Market expansion'},
+  {t:'Find companies that have publicly written about customer churn, retention challenges, onboarding friction, or time-to-value problems in their blogs in the last 6 months', tag:'😰 Pain · Churn + retention'},
+  {t:'Which SaaS companies published content about rebuilding their internal customer health scoring, QBR process, or account management workflows in the last 6 months', tag:'😰 Pain · CS infrastructure rebuild'},
+  {t:'Find B2B companies that have written about scaling their customer success team from small to large or managing high-volume SMB customer bases in the last 6 months', tag:'😰 Pain · CS team scaling'},
+  {t:'Which engineering teams published blog posts about building internal customer dashboards, health score systems, or churn prediction models in the last 6 months', tag:'🏗️ Build vs Buy · Internal tooling'},
+  {t:'Find companies that written publicly about integrating Salesforce, HubSpot, or Intercom with their customer success workflows in the last 90 days', tag:'🏗️ Build vs Buy · CRM integration'},
+  {t:'Which startups published engineering blogs mentioning they are building internal tools for customer data, NPS tracking, or lifecycle automation in the last 6 months', tag:'🏗️ Build vs Buy · Internal NPS lifecycle'},
+  {t:'Find Series A or Series B SaaS companies that have written about crossing 100, 500, or 1000 customers and the operational challenges that came with scale in the last 6 months', tag:'📈 Growth · Scale inflection point'},
+  {t:'Which B2B SaaS companies announced a move upmarket from SMB to mid-market or enterprise in the last 6 months including product announcements or blog posts', tag:'📈 Growth · Upmarket move'},
+  {t:'Find companies that published content about implementing a new customer segmentation, tiering, or pooled CSM model in the last 90 days', tag:'📈 Growth · CS model overhaul'},
+  {t:'Which customer-facing SaaS companies published blogs about using AI for customer support, proactive churn prevention, or automated QBRs in the last 6 months', tag:'🤖 AI · CS automation signal'},
+  {t:'Find companies building AI agents for customer onboarding, in-app guidance, or support deflection that published product updates or engineering posts in the last 3 months', tag:'🤖 AI · Agentic CS tooling'},
+  {t:'Which companies have publicly mentioned migrating away from Gainsight, Totango, ChurnZero, or Planhat — including blog posts referencing a CS tool switch in the last 6 months', tag:'🎯 Displacement · CS tool migration'},
+];
+
+let pageSize      = 10;     // companies shown at a time (0 = all)
+let expandedGroups = new Set(); // which company domains are expanded
+
+let caRunning     = false;
+let caData        = [];
+let allRows       = [];     // full flat evidence rows — used by filter + CSV
+let currentFilter = 'strong50';
+
+function openCA() {
+  resetCA();
+  document.getElementById('caExp').classList.add('open');
+  setTimeout(() => document.getElementById('caInput').focus(), 80);
+}
+function openCAWith(text) {
+  openCA();
+  setTimeout(() => runQuery(text), 150);
+}
+function closeCA() {
+  document.getElementById('caExp').classList.remove('open');
+}
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['reon','library','configured'].forEach(id =>
+    document.getElementById(id+'-content').style.display = id===tab?'':'none'
+  );
+}
+
+function setPageSize(n, btn) {
+  pageSize = n;
+  document.querySelectorAll('.pg-pill').forEach(b => b.classList.toggle('active', b===btn));
+  const filtered = filterRows(allRows, currentFilter);
+  renderTable(filtered);
+  _updateResCount(filtered);
+}
+
+function _groupRows(rows) {
+  const groups = new Map();
+  rows.forEach(r => {
+    const key = r.company_domain || domainOf(r.url);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  });
+  // Parse date string → timestamp for comparison (0 = no date → sorts last)
+  const ts = d => d ? (new Date(d).getTime()||0) : 0;
+  // Within each group: most recent article first, then by confidence
+  const sorted = [...groups.entries()].map(([k, v]) => [
+    k,
+    v.sort((a,b) => (ts(b.date) - ts(a.date)) || (b.confidence||0) - (a.confidence||0))
+  ]);
+  // Groups themselves: sorted by most recent article DESC
+  sorted.sort((a,b) => (ts(b[1][0].date) - ts(a[1][0].date)) || (b[1][0].confidence||0) - (a[1][0].confidence||0));
+  return sorted;
+}
+
+function _updateResCount(filtered) {
+  const grouped = _groupRows(filtered);
+  const filtCos  = grouped.length;
+  const dispCos  = pageSize === 0 ? filtCos : Math.min(pageSize, filtCos);
+  const signals  = filtered.length;
+  document.getElementById('caResCount').textContent =
+    filtered.length < allRows.length
+      ? `${filtCos} relevant domains · ${signals} signals · filtered`
+      : dispCos < filtCos
+        ? `${dispCos} of ${filtCos} relevant domains · ${signals} signals`
+        : `${filtCos} relevant domains · ${signals} signals`;
+}
+
+function resetCA() {
+  caRunning = false; caData = []; allRows = []; currentFilter = 'all'; pageSize = 10; expandedGroups = new Set();
+  const msgs = document.getElementById('caMsgs');
+  [...msgs.children].forEach(c => { if (c.id !== 'caIntro') c.remove(); });
+  document.getElementById('caSuggs').style.display = '';
+  document.getElementById('caEmpty').style.display = 'flex';
+  document.getElementById('caPipeline').style.display = 'none';
+  document.getElementById('caResHdr').style.display = 'none';
+  document.getElementById('caTblScroll').style.display = 'none';
+  document.getElementById('caSanity').style.display = 'none';
+  document.getElementById('caDlBtn').disabled = true;
+  document.getElementById('caElapsed').style.display = 'none';
+  document.getElementById('caInput').value = '';
+  document.getElementById('caInput').style.height = 'auto';
+  document.getElementById('caTbody').innerHTML = '';
+  ['query','search','scrape','extract','score'].forEach(resetPhase);
+  renderSuggs();
+}
+
+function renderSuggs() {
+  const list = document.getElementById('caSuggList');
+  list.innerHTML = '';
+  SUGGS.slice(0, 5).forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'ca-sugg';
+    el.onclick = () => { el.classList.add('used'); runQuery(s.t); };
+    const preview = s.t.length > 95 ? s.t.slice(0,92)+'…' : s.t;
+    el.innerHTML = `<div class="ca-sugg-arr">→</div><div>
+      <div class="ca-sugg-txt">${esc(preview)}</div>
+      <div class="ca-sugg-tag">${esc(s.tag)}</div>
+    </div>`;
+    list.appendChild(el);
+  });
+}
+
+// ── Pre-query cost estimator (testing only) ───────────────────────────────────
+// Mirrors the cost constants in server.py to show a worst-case estimate before send.
+const COST = {
+  // Search providers (per query + per result)
+  EXA_BASE: 0.005, EXA_RESULT: 0.0001,
+  PAI_BASE: 0.010, PAI_RESULT: 0.0002,
+  SEC_BASE: 0.002, SEC_RESULT: 0.001,
+  FC_SUCCESS: 0.002,
+  // Claude Sonnet ($/1M tokens)
+  SONNET_IN_PER_1M: 3.0, SONNET_OUT_PER_1M: 15.0,
+};
+
+function estimateCost(query) {
+  if (!query || query.length < 5) return null;
+
+  // Heuristic routing — mirrors analyze_tool_routing logic
+  const q = query.toLowerCase();
+  const isSECQuery = /\b(10-k|8-k|s-1|filing|earnings|revenue|profit|mergers?|acquisition|material weakness|sec edgar)\b/.test(q);
+  const isGenericQuery = !isSECQuery;
+
+  const useExa = isGenericQuery || (!isSECQuery);
+  const usePAI = isGenericQuery || (!isSECQuery);
+  const useSEC = isSECQuery;
+
+  // Phase 0: routing call — ~800 input + ~50 output tokens
+  const llmRouting = (800 / 1e6) * COST.SONNET_IN_PER_1M + (50 / 1e6) * COST.SONNET_OUT_PER_1M;
+
+  // Phase 1: derive_search_queries generates up to 15 queries
+  const numQueries = 15;
+
+  // Phase 2: search costs (assume avg results per query)
+  const avgExaResults = 30, avgPAIResults = 20, avgSECResults = 5;
+  const exaCost = useExa ? (COST.EXA_BASE * numQueries + COST.EXA_RESULT * avgExaResults * numQueries) : 0;
+  const paiCost = usePAI ? (COST.PAI_BASE * numQueries + COST.PAI_RESULT * avgPAIResults * numQueries) : 0;
+  const secCost = useSEC ? (COST.SEC_BASE * 3 + COST.SEC_RESULT * avgSECResults * 3) : 0;  // SEC uses only 3 queries
+
+  // Phase 3b: Firecrawl — top 40 pages scraped
+  const fcCost = COST.FC_SUCCESS * 40;
+
+  // Phase 5: synthesis — ~10K input tokens + ~800 output tokens
+  const llmSynth = (10000 / 1e6) * COST.SONNET_IN_PER_1M + (800 / 1e6) * COST.SONNET_OUT_PER_1M;
+
+  const total = llmRouting + exaCost + paiCost + secCost + fcCost + llmSynth;
+  // Round 2 worst case adds ~35% more
+  const worstCase = total * 1.35;
+
+  return {
+    min: total,
+    max: worstCase,
+    breakdown: { llm: llmRouting + llmSynth, exa: exaCost, pai: paiCost, sec: secCost, fc: fcCost },
+    tools: [useExa&&'Exa', usePAI&&'PAI', useSEC&&'SEC', 'Firecrawl', 'Claude×2'].filter(Boolean),
+  };
+}
+
+function updateCostPreview(query) {
+  const el = document.getElementById('costPreview');
+  if (!el) return;
+  if (!query || query.trim().length < 5) { el.style.display = 'none'; return; }
+  const est = estimateCost(query.trim());
+  if (!est) { el.style.display = 'none'; return; }
+  el.style.display = 'inline';
+  el.title = `Breakdown — LLM: $${est.breakdown.llm.toFixed(4)} | Exa: $${est.breakdown.exa.toFixed(4)} | PAI: $${est.breakdown.pai.toFixed(4)} | SEC: $${est.breakdown.sec.toFixed(4)} | Firecrawl: $${est.breakdown.fc.toFixed(4)}\nTools: ${est.tools.join(', ')}`;
+  el.textContent = `~$${est.min.toFixed(3)}–$${est.max.toFixed(3)} est.`;
+}
+
+function caSend() {
+  const v = document.getElementById('caInput').value.trim();
+  if (!v || caRunning) return;
+  document.getElementById('costPreview').style.display = 'none';
+  document.getElementById('caInput').value = '';
+  document.getElementById('caInput').style.height = 'auto';
+  runQuery(v);
+}
+function caKey(e) { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();caSend();} }
+function caGrow(el) {
+  el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,110)+'px';
+  updateCostPreview(el.value);
+}
+
+function addUserBubble(text) {
+  const msgs = document.getElementById('caMsgs');
+  const d = document.createElement('div'); d.className='ca-msg ca-msg-user';
+  d.innerHTML = `<div class="ca-bubble ca-bubble-user">${esc(text)}</div>`;
+  msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight;
+}
+function addAgentBubble(html) {
+  const msgs = document.getElementById('caMsgs');
+  const d = document.createElement('div'); d.className='ca-msg ca-msg-agent';
+  d.innerHTML = `<div class="ca-avatar">✦</div><div class="ca-bubble ca-bubble-agent">${html}</div>`;
+  msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight;
+}
+function addThinking(id) {
+  const msgs = document.getElementById('caMsgs');
+  const d = document.createElement('div'); d.className='ca-thinking'; d.id=id;
+  d.innerHTML=`<div class="ca-dots"><span></span><span></span><span></span></div><div class="ca-think-txt">Searching the web…</div>`;
+  msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight;
+}
+
+const PHASE_MAP = {routing:'query', query_generation:'query', search:'search', scraping:'scrape', extraction:'extract', synthesis:'score'};
+
+function resetPhase(ph) {
+  const el = document.getElementById('ph-'+ph);
+  if (!el) return;
+  el.className = 'ca-phase';
+  const ico = el.querySelector('.ph-ico, .ca-ph-spin, .ca-ph-ok');
+  if (ico) { ico.className='ph-ico'; ico.textContent='·'; ico.style.fontSize='9px'; }
+}
+function setPhase(ph, status) {
+  const el = document.getElementById('ph-'+ph);
+  if (!el) return;
+  el.className = 'ca-phase '+(status||'');
+  const ico = el.querySelector('.ph-ico, .ca-ph-spin, .ca-ph-ok');
+  if (!ico) return;
+  if (status === 'running') {
+    const s = document.createElement('div'); s.className='ca-ph-spin';
+    ico.replaceWith(s);
+  } else if (status === 'done') {
+    const cur = el.querySelector('.ca-ph-spin') || el.querySelector('.ph-ico');
+    if (cur) { const ok=document.createElement('span'); ok.className='ca-ph-ok'; ok.textContent='✓'; cur.replaceWith(ok); }
+  }
+}
+function setLog(msg) { const el=document.getElementById('caLog'); if(el) el.textContent=msg; }
+
+async function runQuery(query) {
+  if (caRunning) return;
+  caRunning = true; caData = [];
+
+  document.getElementById('caSuggs').style.display = 'none';
+  document.getElementById('caSendBtn').disabled = true;
+  addUserBubble(query);
+  document.getElementById('caEmpty').style.display = 'none';
+  document.getElementById('caPipeline').style.display = 'block';
+  document.getElementById('caResHdr').style.display = 'none';
+  document.getElementById('caTblScroll').style.display = 'none';
+  document.getElementById('caSanity').style.display = 'none';
+  document.getElementById('caTbody').innerHTML = '';
+  ['query','search','scrape','extract','score'].forEach(resetPhase);
+  setLog('Connecting…');
+  addThinking('caThink');
+
+  try {
+    const resp = await fetch(API, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({question: query}),
+    });
+    if (!resp.ok) throw new Error(`Server error ${resp.status}: ${await resp.text()}`);
+
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {stream:true});
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (const part of parts) {
+        const lines = part.trim().split('\n');
+        let event='message', dataStr='';
+        for (const l of lines) {
+          if (l.startsWith('event:')) event=l.slice(6).trim();
+          if (l.startsWith('data:'))  dataStr=l.slice(5).trim();
+        }
+        if (dataStr) handleEvent(event, JSON.parse(dataStr));
+      }
+    }
+  } catch(err) {
+    removeEl('caThink');
+    setLog('Error: '+err.message);
+    addAgentBubble(`<div class="ca-aname">SDR Intelligence Agent</div>
+      <p style="color:#dc2626">⚠ ${esc(err.message)}</p>
+      <p style="margin-top:6px;font-size:11px;color:var(--muted)">Make sure <code>server.py</code> is running on port 4001.</p>`);
+  }
+
+  caRunning = false;
+  document.getElementById('caSendBtn').disabled = false;
+}
+
+function handleEvent(event, data) {
+  if (event === 'start') {
+    setLog('Pipeline started…');
+  } else if (event === 'phase') {
+    const ph = PHASE_MAP[data.phase] || data.phase;
+    setPhase(ph, data.status);
+    setLog(data.msg || '');
+    if (data.status==='running') {
+      const el=document.getElementById('caThink');
+      if (el) el.querySelector('.ca-think-txt').textContent = data.msg||'Working…';
+    }
+  } else if (event === 'done') {
+    removeEl('caThink');
+    ['query','search','scrape','extract','score'].forEach(p => setPhase(p,'done'));
+    renderResults(data);
+    const n = caData.length;
+    const san = data.sanity_report||{};
+    addAgentBubble(`
+      <div class="ca-aname">SDR Intelligence Agent</div>
+      <p>Found <strong>${data.total_companies||0} companies</strong> publishing about this topic.</p>
+      <p style="margin-top:4px;font-size:11px;color:var(--muted)">${n} evidence signal${n!==1?'s':''} collected across all sources.</p>
+      ${san.rejected?`<p style="margin-top:5px;font-size:11px;color:var(--muted)">🛡 Sanity filter removed ${san.rejected} stale result${san.rejected!==1?'s':''} older than ${san.max_days_filter} days.</p>`:''}
+      ${n===0?'<p style="margin-top:6px;font-size:11px;color:var(--muted)">No results above threshold. Try rephrasing with more specific signals.</p>':`<p style="margin-top:6px;font-size:11px;color:var(--muted)">Showing the <strong>top 10 by confidence score</strong> — download all ${data.total_companies||0} as CSV above.</p>`}
+    `);
+    if (data.elapsed) {
+      const el=document.getElementById('caElapsed');
+      el.textContent=`${data.elapsed}s`;
+      el.style.display='inline';
+    }
+  }
+}
+
+// ── Recency helper ────────────────────────────────────────────────────────────
+function recencyInfo(dateStr) {
+  if (!dateStr || !dateStr.trim()) return {dateTxt:'',recClass:'rec-unknown',recLabel:'',days:null,verified:false};
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return {dateTxt:dateStr.slice(0,10),recClass:'rec-unknown',recLabel:'',days:null,verified:false};
+  const days = Math.floor((Date.now()-d.getTime())/86400000);
+  // Reject future dates as unverified (clock skew or bad data)
+  if (days < -1) return {dateTxt:dateStr.slice(0,10),recClass:'rec-unknown',recLabel:'',days:null,verified:false};
+  const dateTxt = d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  if (days<=14)  return {dateTxt,recClass:'rec-fresh',recLabel:'fresh',days,verified:true};
+  if (days<=90)  return {dateTxt,recClass:'rec-ok',   recLabel:`${days}d ago`,days,verified:true};
+  if (days<=180) return {dateTxt,recClass:'rec-warn', recLabel:`${days}d ago`,days,verified:true};
+  return {dateTxt,recClass:'rec-old',recLabel:`${days}d ago`,days,verified:true};
+}
+
+// ── Build a flat evidence row from company + evidence item ────────────────────
+function buildRow(co, ev) {
+  const rec = recencyInfo(ev.date||'');
+  return {
+    company_name:       ev.company_name || co.company_name || co.company_domain,
+    company_domain:     ev.company_domain || co.company_domain,
+    news_source_domain: ev.news_source_domain || domainOf(ev.url||''),
+    url:                ev.url||'',
+    title:              ev.title||'',
+    content_type:       ev.content_type||'article',
+    key_excerpt:        ev.key_excerpt||ev.snippet||'',
+    confidence:         ev.confidence||0,
+    date:               ev.date||'',
+    discovered_via:     ev.discovered_via||'unknown',
+    snippet:            ev.snippet||'',
+    // computed
+    dateInfo:           rec,
+  };
+}
+
+// ── Filter rows by current filter ─────────────────────────────────────────────
+function filterRows(rows, filter) {
+  switch (filter) {
+    case 'verified': return rows.filter(r => r.dateInfo.verified).sort((a,b) => b.confidence - a.confidence);
+    case '90d':      return rows.filter(r => r.dateInfo.verified && r.dateInfo.days <= 90).sort((a,b) => b.confidence - a.confidence);
+    case '30d':      return rows.filter(r => r.dateInfo.verified && r.dateInfo.days <= 30).sort((a,b) => b.confidence - a.confidence);
+    case 'strong50': return rows.filter(r => r.confidence >= 0.50).sort((a,b) => b.confidence - a.confidence);
+    case 'strong':   return rows.filter(r => r.confidence >= 0.70).sort((a,b) => b.confidence - a.confidence);
+    default:         return [...rows].sort((a,b) => b.confidence - a.confidence);
+  }
+}
+
+function applyFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.ca-filter').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const filtered = filterRows(allRows, filter);
+  renderTable(filtered);
+  _updateResCount(filtered);
+}
+
+// ── Suggest next sales action + which Reo agent to run next ───────────────────
+// Zero API calls — pure pattern match on existing title + excerpt text.
+// agents[] maps to the agent names in the Reo platform.
+function suggestNextStep(row) {
+  const t = ((row.title||'') + ' ' + (row.key_excerpt||'')).toLowerCase();
+  // [regex, icon, action label, pill class, follow-up agents]
+  const rules = [
+    [/\b(raises?|raised|funding|series [a-f]|seed round|pre-seed|\$\d+m|\bmillion\b|invest)/,
+      '💰', 'Strike now — budget just unlocked', 'ns-fund',
+      ['Tech Embedded','Tech Hiring','Headcount Fit']],
+
+    [/\b(appoints?|hired as|joins? .{0,25} as|new (vp|cco|cro|cso|cpo|cto|cmo)|names? .{0,20} (as|to)|promoted to|welcomes? .{0,20})\b/,
+      '👋', 'Congrats outreach to new exec', 'ns-hire',
+      ['Tech Embedded','Free Text']],
+
+    [/\b(switch(ing|ed)?|migrat(ing|ed|ion)|replac(ing|ed)|moving (off|away|from)|drop(ping|ped)|away from|evaluating alternatives|tool change|platform change)\b/,
+      '🎯', 'Displacement pitch — actively evaluating', 'ns-displace',
+      ['Tech Migrations','Tech Hiring','Tech Embedded']],
+
+    [/\b(frustrat|pain point|challen|struggle|inefficien|manual process|doesn.t scale|too expensive|hidden fee|pricing issue|not working|broken|problem with)\b/,
+      '😰', 'Lead with pain-first discovery', 'ns-pain',
+      ['Tech Embedded','Public Data Crawler']],
+
+    [/\b(launch(ing|ed|es)?|announc(ing|ed|es)?|introduc(ing|ed)|unveil(ing|ed)|new product|new feature|generally available|beta)\b/,
+      '🚀', 'Engage on product direction fit', 'ns-launch',
+      ['Tech Scaling','Tech Hiring','Tech Embedded']],
+
+    [/\b(hir(ing|ed)|job post|open role|looking for|recruiting|headcount|team.*grow|scaling team|expand(ing)? team)\b/,
+      '📈', 'Team scaling — high growth signal', 'ns-scale',
+      ['Tech Hiring','Team Scaling','Headcount Fit']],
+
+    [/\b(blog|case study|wrote|published|article|playbook|how we|lessons learned|teardown|deep.?dive)\b/,
+      '📖', 'Engage on content — in active research mode', 'ns-content',
+      ['Tech Embedded','Free Text']],
+  ];
+  for (const [re, icon, action, cls, agents] of rules) {
+    if (re.test(t)) return {icon, action, cls, agents};
+  }
+  return {icon:'🔍', action:'Research & personalise outreach', cls:'ns-default',
+          agents:['Tech Embedded','Free Text']};
+}
+
+// ── Toggle expand/collapse for a company group ────────────────────────────────
+function toggleGroup(coDom) {
+  if (expandedGroups.has(coDom)) expandedGroups.delete(coDom);
+  else expandedGroups.add(coDom);
+  renderTable(filterRows(allRows, currentFilter));
+}
+
+// ── Build a single evidence cell set (reused for main row + sub-rows) ─────────
+function _evidenceCells(r, isSubRow) {
+  const sc       = r.confidence||0;
+  const scCls    = sc>=0.70?'sc-hi':sc>=0.45?'sc-md':'sc-lo';
+  const scTxt    = Math.round(sc*100)+'%';
+  const ct       = (r.content_type||'').toLowerCase();
+  const ctCls    = ct.includes('blog')?'ct-blog':ct.includes('ann')?'ct-ann':ct.includes('white')?'ct-wp':ct.includes('case')?'ct-cs':(ct.includes('guide')||ct.includes('play'))?'ct-guide':ct.includes('doc')?'ct-doc':'ct-other';
+  const ctLabel  = ct?ct.replace(' post',''):'article';
+  const srcCls   = r.discovered_via==='exa'?'src-exa':r.discovered_via==='parallel_ai'?'src-pai':r.discovered_via==='sec_edgar'?'src-sec':'src-fc';
+  const srcLabel = r.discovered_via==='exa'?'⚡ Exa':r.discovered_via==='parallel_ai'?'🔵 Parallel AI':r.discovered_via==='sec_edgar'?'🏛 SEC API':'🔥 Firecrawl';
+  const {dateTxt,recClass,recLabel,verified} = r.dateInfo;
+  const excerpt   = (r.key_excerpt||r.title||'').slice(0, isSubRow ? 120 : 155);
+  const urlRaw    = r.url||'';
+  const urlDisp   = urlRaw.replace(/^https?:\/\/(www\.)?/,'').slice(0,42);
+  const urlSafe   = urlRaw.replace(/'/g,"\\'");
+  const newsSrc   = r.news_source_domain || domainOf(urlRaw);
+  const coDom     = r.company_domain || domainOf(urlRaw);
+  const isWire    = newsSrc !== coDom;
+
+  let dateCell = verified && dateTxt
+    ? `<div class="date-main">${esc(dateTxt)}</div><span class="date-rec ${recClass}">${esc(recLabel)}</span>`
+    : `<span class="date-unverified-badge">⚠ unverified</span>`;
+
+  // News source cell (only on main row; sub-rows indent under it)
+  const srcDomCell = isSubRow
+    ? `<td style="padding-left:10px;border-left:3px solid var(--border)">
+         <span style="font-family:var(--mono);font-size:9px;color:var(--faint)">${esc(newsSrc)}</span>
+       </td>`
+    : `<td>
+         <div class="co-wrap">
+           <img src="https://www.google.com/s2/favicons?domain=${newsSrc}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-fav"/>
+           <div><div class="co-name" style="color:var(--muted);font-size:11px">${esc(newsSrc)}</div></div>
+         </div>
+       </td>`;
+
+  const ns = suggestNextStep(r);
+  const agentTags = (ns.agents||[]).map(a=>`<span class="ns-agent" title="Run ${esc(a)} agent">${esc(a)}</span>`).join('');
+
+  return `
+    ${srcDomCell}
+    <td><span class="ct-badge ${ctCls}">${esc(ctLabel)}</span></td>
+    <td>
+      <div class="sig-txt" style="font-size:${isSubRow?'11px':'12px'}">${esc(excerpt)}</div>
+    </td>
+    <td><span class="sc-pill ${scCls}">${scTxt}</span></td>
+    <td>${dateCell}</td>
+    <td><span class="proof-url" title="${esc(urlRaw)}" onclick="try{navigator.clipboard.writeText('${urlSafe}');this.textContent='✓ copied';setTimeout(()=>this.textContent='${urlDisp.slice(0,42).replace(/'/g,"\\'")}${urlDisp.length>=42?'…':''}',1200)}catch(e){}">${esc(urlDisp)}${urlDisp.length>=42?'…':''}</span></td>
+    <td><span class="src-badge ${srcCls}">${srcLabel}</span></td>
+    <td>
+      <div class="ns-cell">
+        <span class="ns-pill ${ns.cls}">${ns.icon} ${esc(ns.action)}</span>
+        ${agentTags ? `<div class="ns-agents">${agentTags}</div>` : ''}
+      </div>
+    </td>
+  `;
+}
+
+// ── Render tbody — one row per company, expandable sub-rows ──────────────────
+function renderTable(rows) {
+  const tb = document.getElementById('caTbody');
+  tb.innerHTML = '';
+
+  if (rows.length === 0) {
+    tb.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--faint);font-size:11.5px">
+      No results match this filter. Try "All results".</td></tr>`;
+    document.getElementById('caTblScroll').style.display = 'block';
+    return;
+  }
+
+  const allGroups   = _groupRows(rows);
+  const totalCos    = allGroups.length;
+  const dispGroups  = pageSize === 0 ? allGroups : allGroups.slice(0, pageSize);
+  const hiddenCos   = totalCos - dispGroups.length;
+
+  // Update page-size bar
+  const loadMoreEl  = document.getElementById('caLoadMore');
+  const loadMoreSub = document.getElementById('caLoadMoreSub');
+  loadMoreEl.style.display = 'flex';
+  loadMoreSub.textContent  = hiddenCos > 0
+    ? `Showing top ${dispGroups.length} of ${totalCos} companies by confidence score — ${hiddenCos} more available`
+    : `All ${totalCos} companies shown`;
+
+  dispGroups.forEach(([coDom, coRows]) => {
+    const best      = coRows[0];
+    const hasMore   = coRows.length > 1;
+    const isExpanded = expandedGroups.has(coDom);
+    const coName    = best.company_name || coDom.split('.')[0].replace('-',' ');
+
+    // ── Main company row ──
+    const trMain = document.createElement('tr');
+    trMain.style.cssText = 'cursor:pointer;background:#fff';
+    trMain.onmouseover = () => trMain.style.background = '#fafafa';
+    trMain.onmouseout  = () => trMain.style.background = '#fff';
+    if (hasMore) trMain.onclick = () => toggleGroup(coDom);
+
+    const expandBtn = hasMore
+      ? `<span style="font-family:var(--mono);font-size:9px;color:var(--accent);margin-left:6px;user-select:none">${isExpanded?'▾':'▸'} ${coRows.length}</span>`
+      : '';
+
+    trMain.innerHTML = `
+      <td>
+        <div class="co-wrap">
+          <img src="https://www.google.com/s2/favicons?domain=${coDom}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-fav"/>
+          <div>
+            <div class="co-name" style="display:flex;align-items:center">${esc(coName)}${expandBtn}</div>
+          </div>
+        </div>
+      </td>
+      <td><span style="font-family:var(--mono);font-size:10px;color:var(--accent)">${esc(coDom)}</span></td>
+      ${_evidenceCells(best, false)}
+    `;
+    tb.appendChild(trMain);
+
+    // ── Sub-rows (only when expanded) ──
+    if (isExpanded && hasMore) {
+      coRows.slice(1).forEach(r => {
+        const trSub = document.createElement('tr');
+        trSub.style.cssText = 'background:#fafbff';
+        trSub.innerHTML = `<td></td><td></td>${_evidenceCells(r, true)}`;
+        tb.appendChild(trSub);
+      });
+    }
+  });
+
+  document.getElementById('caTblScroll').style.display = 'block';
+}
+
+// ── Render results (called once from handleEvent done) ────────────────────────
+function renderResults(data) {
+  allRows = [];
+  caData  = [];
+
+  for (const co of (data.companies||[])) {
+    for (const ev of (co.evidence||[])) {
+      const row = buildRow(co, ev);
+      allRows.push(row);
+      caData.push(row);  // caData used for CSV — same objects
+    }
+  }
+
+  // Header
+  const hdr = document.getElementById('caResHdr');
+  hdr.style.display = 'flex';
+  const total    = allRows.length;
+  const coCount  = data.total_companies||0;
+  const unverified = allRows.filter(r => !r.dateInfo.verified).length;
+
+  // Initial count — renderTable will refine via _updateResCount
+  const dispCos = pageSize === 0 ? coCount : Math.min(pageSize, coCount);
+  document.getElementById('caResCount').textContent =
+    dispCos < coCount
+      ? `${dispCos} of ${coCount} companies · ${total} signals`
+      : `${coCount} companies · ${total} signals`;
+  document.getElementById('caResMeta').textContent =
+    `· ${(data.question||'').slice(0,45)}${(data.question||'').length>45?'…':''}`;
+
+  const uvBadge = document.getElementById('caUnverifiedBadge');
+  if (unverified > 0) {
+    uvBadge.textContent = `⚠ ${unverified} unverified date${unverified!==1?'s':''}`;
+    uvBadge.style.display = 'inline';
+  } else {
+    uvBadge.style.display = 'none';
+  }
+
+  document.getElementById('caDlBtn').disabled = total === 0;
+
+  // Reset filter to 'strong50' (Score ≥50%, sorted by score desc) and render
+  currentFilter = 'strong50';
+  document.querySelectorAll('.ca-filter').forEach((b,i) => b.classList.toggle('active', i===1));
+  renderTable(filterRows(allRows, 'strong50'));
+
+  // Sanity bar
+  const san = document.getElementById('caSanity');
+  const hi  = allRows.filter(r=>r.confidence>=0.70).length;
+  const med = allRows.filter(r=>r.confidence>=0.45&&r.confidence<0.70).length;
+  const lo  = allRows.filter(r=>r.confidence<0.45).length;
+  const tools = [...new Set(allRows.map(r=>r.discovered_via).filter(Boolean))].map(t=>t==='exa'?'Exa':t==='parallel_ai'?'Parallel AI':'Firecrawl');
+  const verifiedCount = allRows.filter(r=>r.dateInfo.verified).length;
+  san.style.display = 'flex';
+  san.innerHTML = `
+    <div style="display:flex;align-items:center;gap:5px"><span class="san-dot san-ok"></span>${hi} strong ≥70%</div>
+    <div style="display:flex;align-items:center;gap:5px"><span class="san-dot san-md"></span>${med} moderate 45–70%</div>
+    ${lo?`<div style="display:flex;align-items:center;gap:5px"><span class="san-dot san-lo"></span>${lo} weak &lt;45%</div>`:''}
+    <div style="display:flex;align-items:center;gap:5px"><span class="san-dot san-info"></span>${verifiedCount}/${total} dates verified</div>
+    <div style="display:flex;align-items:center;gap:5px"><span class="san-dot san-info"></span>Tools: ${tools.join(', ')||'—'}</div>
+    ${(data.sanity_report||{}).rejected?`<div style="margin-left:auto;color:#d97706;display:flex;align-items:center;gap:4px"><span class="san-dot san-md"></span>${data.sanity_report.rejected} stale removed</div>`:''}
+  `;
+}
+
+// ── CSV Download — exports ALL rows (ignores current filter) ──────────────────
+function caDownload() {
+  if (!caData.length) return;
+  const hdrs = [
+    'News Source','Company','Company Domain','Title','Content Type','Signal Excerpt',
+    'Next Step','Confidence','Published Date','Date Verified','Days Ago','Proof URL','Discovered Via'
+  ];
+  const rows = caData.map(r => {
+    const {dateTxt, verified, days} = r.dateInfo;
+    const ns = suggestNextStep(r);
+    return [
+      r.news_source_domain || domainOf(r.url||''),
+      r.company_name||'',
+      r.company_domain||domainOf(r.url||''),
+      r.title||'',
+      r.content_type||'',
+      (r.key_excerpt||r.snippet||'').replace(/[\n\r]+/g,' ').trim(),
+      ns.action,
+      Math.round((r.confidence||0)*100)+'%',
+      dateTxt || r.date || '',
+      verified ? 'Yes' : 'No',
+      days != null ? days+'d' : '',
+      r.url||'',
+      r.discovered_via||'',
+    ];
+  });
+  const csv = [hdrs,...rows].map(row =>
+    row.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')
+  ).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
+  a.download = `reo-sdr-signals-${new Date().toISOString().slice(0,10)}-${caData.length}rows.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function domainOf(url){const m=(url||'').match(/https?:\/\/(?:www\.)?([^/]+)/);return m?m[1].toLowerCase():'';}
+function removeEl(id){const e=document.getElementById(id);if(e)e.remove();}
+
+renderSuggs();
+</script>
+</body>
+</html>
