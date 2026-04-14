@@ -1438,8 +1438,9 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
             meta       = url_meta.get(ev["url"], {})
             url_domain = extract_domain_from_url(ev["url"])
 
-            # Use AI Extractor as the absolute source of truth if available
-            ai_data = ai_entities.get(ev["url"], {})
+            # Use AI Extractor as the absolute source of truth if available (except for SEC filings)
+            is_sec = meta.get("source") == "sec_edgar"
+            ai_data = ai_entities.get(ev["url"], {}) if not is_sec else {}
             co_name = ai_data.get("subject_company") or meta.get("company_name") or ev.get("company_name") or ""
             
             # Resolve domain priorities: AI > Meta > Regex Inference
