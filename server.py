@@ -106,26 +106,31 @@ def log_query_metrics(query: str, tools_used: dict, llm_cost: float,
     except Exception as e:
         print("Failed to log metrics:", e)
 
-# ── Domains to exclude (news aggregators, not companies) ─────────────────────
+# ── Domains to DROP entirely (social media — never contain company signals) ───
 _MEDIA_DOMAINS = {
-    "techcrunch.com", "bloomberg.com", "forbes.com", "reuters.com", "wsj.com",
-    "ft.com", "wired.com", "venturebeat.com", "sifted.eu", "crunchbase.com",
-    "businessinsider.com", "cnbc.com", "theverge.com", "zdnet.com",
-    "infoq.com", "hackernews.com", "news.ycombinator.com",
+    "linkedin.com", "twitter.com", "x.com",
+    "hackernews.com", "news.ycombinator.com",
     # NOTE: medium.com and substack.com intentionally NOT excluded —
     # many companies publish their engineering/growth blogs there.
-    "linkedin.com", "twitter.com", "x.com",
 }
 
-# ── Press-wire / news-wire domains ────────────────────────────────────────────
+# ── Press-wire / news-wire / aggregator domains ──────────────────────────────
 # Articles from these domains are ABOUT a company, not FROM the company.
-# We extract the subject company name from the headline and infer their domain.
+# The company name must be extracted from the article content, not the URL.
 _NEWS_WIRE_DOMAINS = {
     "prnewswire.com", "businesswire.com", "globenewswire.com",
     "accesswire.com", "prnews.io", "einpresswire.com",
     "prweb.com", "newswire.com", "apnews.com", "marketwatch.com",
     "finance.yahoo.com", "investing.com", "seekingalpha.com",
     "businessinsider.com", "entrepreneur.com", "inc.com",
+    # Aggregators / directories — the subject is inside the article
+    "stocktitan.net", "ycombinator.com", "crunchbase.com",
+    "tracxn.com", "pitchbook.com", "cbinsights.com",
+    "wellfound.com", "angel.co", "f6s.com",
+    "techcrunch.com", "venturebeat.com", "sifted.eu",
+    "wired.com", "zdnet.com", "theverge.com",
+    "forbes.com", "bloomberg.com", "reuters.com", "cnbc.com",
+    "ft.com", "infocapital.com", "theregister.com",
 }
 
 # ── Entity resolution ─────────────────────────────────────────────────────────
@@ -992,28 +997,23 @@ def extract_evidence(url: str, content: str, question: str, hint_date: str = "")
     }
 
 # ── Step 4b: Extract True Subject Entities (Phase 4 AI Extractor) ─────────
-async def extract_subjects_with_ai(client: httpx.AsyncClient, evidence_list: list[dict], question: str) -> tuple[dict[str, dict], float]:
-    """
-    Uses Claude to isolate the ACTUAL company acting in the snippet.
-    Returns (extractions_dict, llm_cost) — cost was previously untracked!
-    """
-    if not evidence_list:
-        return {}, 0.0
-    
-    payload = [{"url": e["url"], "snippet": e.get("key_excerpt") or e.get("snippet") or ""} for e in evidence_list[:50]]
-    
+async def _extract_subjects_batch(client: httpx.AsyncClient, batch: list[dict], question: str) -> tuple[dict[str, dict], float]:
+    """Process a single batch of up to 15 snippets through Claude."""
     prompt = f"""You are a strict B2B Data Analyst mapping insights to true commercial subjects.
 The user specifically asked for: "{question}"
 
-I will provide an array of web snippets that contain relevant data. Your job is to extract the ACTUAL company performing the core action (e.g., the company migrating CRMs, the company raising funds), NOT the news outlet or the consulting agency publishing the blog post.
+I will provide an array of web snippets. Your job is to extract the ACTUAL company performing the core action (e.g., the company raising funds, the company building AI), NOT the news outlet, press wire, or directory listing the article.
 
 Rules:
-1. If dench.com writes a blog titled "How Acme Corp Migrated to HubSpot", the subject is "Acme Corp", domain "acme.com". NOT Dench.
-2. If it is a generic "How-to" guide published by a company (e.g. "How to migrate" by HubSpot), then the subject is just HubSpot / hubspot.com.
-3. If it's a first-person post ("We migrated.."), the subject is the publisher domain.
-4. If a company name is not obvious, fall back to the publisher.
+1. If prnewswire.com or stocktitan.net publishes "Acme Corp Raises $10M Series A", the subject is "Acme Corp", domain "acme.com". NOT PRNewswire or Stocktitan.
+2. If ycombinator.com lists a startup directory entry for "Brex", the subject is "Brex", domain "brex.com". NOT Ycombinator.
+3. If wellfound.com or crunchbase.com has a profile page for "Notion", the subject is "Notion", domain "notion.so". NOT Wellfound.
+4. If it is a generic "How-to" guide published by a company (e.g. "How to migrate" by HubSpot), then the subject is just HubSpot / hubspot.com.
+5. If it's a first-person post ("We migrated.."), the subject is the publisher.
+6. If a company name is not obvious, use "unknown" for both fields.
+7. NEVER use a news site, press wire, or aggregator as the subject_company.
 
-Return ONLY a JSON object mapping:
+Return ONLY a JSON object:
 {{
   "extractions": [
     {{"url": "...", "subject_company": "Acme Corp", "subject_domain": "acme.com"}}
@@ -1021,7 +1021,7 @@ Return ONLY a JSON object mapping:
 }}
 
 Snippets to analyze:
-{json.dumps(payload)}"""
+{json.dumps(batch)}"""
 
     try:
         resp = await client.post(
@@ -1029,14 +1029,13 @@ Snippets to analyze:
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
             json={
                 "model": "claude-3-haiku-20240307",
-                "max_tokens": 1500,
-                "system": "Output only valid JSON.",
+                "max_tokens": 2000,
+                "system": "Output only valid JSON. Never use news sites as subject_company.",
                 "messages": [{"role": "user", "content": prompt}]
             },
-            timeout=25,
+            timeout=30,
         )
         data = resp.json()
-        # Track cost — this call was previously unaccounted for
         usage    = data.get("usage", {})
         ai_cost  = (usage.get("input_tokens", 0) / 1_000_000) * COST_HAIKU_IN_PER_1M \
                  + (usage.get("output_tokens", 0) / 1_000_000) * COST_HAIKU_OUT_PER_1M
@@ -1050,6 +1049,41 @@ Snippets to analyze:
     except Exception as e:
         print("Subject Entity Extraction failed via AI:", e)
         return {}, 0.0
+
+async def extract_subjects_with_ai(client: httpx.AsyncClient, evidence_list: list[dict], question: str) -> tuple[dict[str, dict], float]:
+    """
+    Uses Claude to isolate the ACTUAL company acting in the snippet.
+    Processes in batches of 15 to avoid output truncation.
+    Returns (extractions_dict, llm_cost).
+    """
+    if not evidence_list:
+        return {}, 0.0
+    
+    all_payloads = [{"url": e["url"], "snippet": e.get("key_excerpt") or e.get("snippet") or ""} for e in evidence_list[:60]]
+    
+    # Process in chunks of 15 to prevent output token truncation
+    BATCH_SIZE = 15
+    batches = [all_payloads[i:i+BATCH_SIZE] for i in range(0, len(all_payloads), BATCH_SIZE)]
+    
+    results = await asyncio.gather(*[
+        _extract_subjects_batch(client, batch, question) for batch in batches
+    ])
+    
+    merged: dict[str, dict] = {}
+    total_cost = 0.0
+    for batch_result, batch_cost in results:
+        merged.update(batch_result)
+        total_cost += batch_cost
+    
+    # Post-processing: reject any extraction where the subject is a known news wire
+    cleaned: dict[str, dict] = {}
+    for url, data in merged.items():
+        subj_domain = (data.get("subject_domain") or "").lower().strip()
+        if subj_domain and subj_domain not in _NEWS_WIRE_DOMAINS and subj_domain not in _MEDIA_DOMAINS:
+            cleaned[url] = data
+        # else: drop it — AI accidentally set a news wire as subject
+    
+    return cleaned, total_cost
 
 # ── Step 5: Synthesize final answer (template-based) ─────────────────────────
 async def synthesize_answer(client: httpx.AsyncClient, question: str, evidence_by_company: dict) -> tuple[str, float]:
@@ -1368,14 +1402,18 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
                 # Base confidence 0.65 from neural search relevance. Lexical hits add bonus.
                 conf = round(min(0.85, 0.65 + (overlap / max(effective_denom, 1) * 0.3)), 2)
                 src_dom  = r.get("domain", "")
+                is_wire  = src_dom in _NEWS_WIRE_DOMAINS
                 co_name  = r.get("company_name") or ""
-                if not co_name:
+                if not co_name and not is_wire:
+                    # Only derive company name from domain if it's NOT a news wire
                     co_name = src_dom.split('.')[0].replace('-', ' ').title()
+                # For news wires / aggregators, leave co_name blank —
+                # the AI extractor will fill it in Phase 4.
                 # For SEC filings, company_domain is pre-resolved from filing metadata;
                 # don't attempt to re-resolve from "sec.gov" URL domain.
                 co_domain = r.get("company_domain") or (
                     infer_company_domain(co_name) if src_dom == "sec.gov"
-                    else _resolve_company_domain(co_name, src_dom)
+                    else (_resolve_company_domain(co_name, src_dom) if not is_wire else "")
                 )
                 # Use SEC-specific content type for filings
                 content_type = (
