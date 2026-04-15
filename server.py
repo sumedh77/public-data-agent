@@ -1123,26 +1123,27 @@ def extract_evidence(url: str, content: str, question: str, hint_date: str = "")
 # ── Step 4b: Extract True Subject Entities (Phase 4 AI Extractor) ─────────
 async def _extract_subjects_batch(client: httpx.AsyncClient, batch: list[dict], question: str) -> tuple[dict[str, dict], float]:
     """Process a single batch of up to 15 snippets through Claude."""
-    prompt = f"""You are a strict B2B Data Analyst mapping insights to true commercial subjects.
+    prompt = f"""You are an elite RevOps Data Analyst.
 The user specifically asked for: "{question}"
 
-I will provide an array of web snippets. Your job is twofold:
-1. Extract the ACTUAL subject company performing the core action (e.g., the company raising funds, the company building AI), NOT the news outlet, press wire, or directory listing the article.
-2. Write a highly concise 1-2 sentence `aligned_signal` that directly answers the user's query based on the snippet. Do not use generic filler words like "This article discusses...". Make it punchy, specific, and insightful (e.g., mention the specific executive, the exact technology used, etc.).
+I will provide an array of web snippets. Each snippet has an "id". Your job is twofold:
+1. Extract the ACTUAL subject company performing the core action (e.g., the company building AI, the company firing people, etc.), NOT the news outlet, press wire, or directory listing it.
+2. Write a highly precise, well-crafted 1-2 sentence `aligned_signal` that DIRECTLY answers the user's query based on the snippet. 
+   - NEVER use filler like "This article discusses..." or "Section Title: ...". 
+   - DO extract the names of executives, specific tools, or critical strategies mentioned.
+   - Example 1: "Jane Doe, VP of Engineering at Acme Corp, published a technical deep-dive on replacing their legacy CRM with a custom agentic orchestration layer."
+   - Example 2: "TinyFish emerged from stealth with a $15M seed round to build autonomous database agents."
 
 Rules:
-1. If prnewswire.com or stocktitan.net publishes "Acme Corp Raises $10M Series A", the subject is "Acme Corp", domain "acme.com". NOT PRNewswire or Stocktitan.
-2. If ycombinator.com lists a startup directory entry for "Brex", the subject is "Brex", domain "brex.com". NOT Ycombinator.
-3. If wellfound.com or crunchbase.com has a profile page for "Notion", the subject is "Notion", domain "notion.so". NOT Wellfound.
-4. If it is a generic "How-to" guide published by a company, the subject is the publisher.
-5. If it's a first-person post ("We migrated.."), the subject is the publisher.
-6. If a company name is not obvious or it is purely a generic news roundup, explicitly output "unknown" for both company and domain. DO NOT guess the news outlet.
-7. NEVER use a news site, press wire, or aggregator as the subject_company.
+1. If prnewswire.com or stocktitan.net publishes "Acme Corp Raises $10M Series A", the subject is "Acme Corp", domain "acme.com".
+2. If it is a generic "How-to" guide published by a company, the subject is the publisher.
+3. If a company name is not obvious or it is purely a generic news roundup of many companies, explicitly output "unknown" for both company and domain. DO NOT guess the news outlet.
+4. NEVER use a news site, press wire, or aggregator as the subject_company.
 
 Return ONLY a JSON object:
 {{
   "extractions": [
-    {{"url": "...", "subject_company": "Acme Corp", "subject_domain": "acme.com", "aligned_signal": "Acme Corp's CTO published a detailed architecture guide on their transition to AI agents."}}
+    {{"id": "0", "subject_company": "Acme Corp", "subject_domain": "acme.com", "aligned_signal": "Acme Corp's CTO published a detailed architecture guide on their transition to AI agents."}}
   ]
 }}
 
@@ -1156,7 +1157,7 @@ Snippets to analyze:
             json={
                 "model": "claude-3-haiku-20240307",
                 "max_tokens": 2000,
-                "system": "Output only valid JSON. Never use news sites as subject_company.",
+                "system": "Output only valid JSON. Never use news sites as subject_company. Focus on who is acting and what they are doing.",
                 "messages": [{"role": "user", "content": prompt}]
             },
             timeout=30,
@@ -1168,7 +1169,7 @@ Snippets to analyze:
         raw_text = data.get("content", [{}])[0].get("text", "{}")
         json_match = re.search(r'\{.*\}', raw_text.replace('\n', ''), re.DOTALL)
         res = json.loads(json_match.group(0)) if json_match else json.loads(raw_text)
-        return {item["url"]: item for item in res.get("extractions", [])}, ai_cost
+        return {str(item["id"]): item for item in res.get("extractions", []) if "id" in item}, ai_cost
     except httpx.HTTPStatusError as e:
         print(f"Subject Entity Extraction HTTP failed: {e.response.text}")
         return {}, 0.0
@@ -1185,7 +1186,11 @@ async def extract_subjects_with_ai(client: httpx.AsyncClient, evidence_list: lis
     if not evidence_list:
         return {}, 0.0
     
-    all_payloads = [{"url": e["url"], "snippet": e.get("key_excerpt") or e.get("snippet") or ""} for e in evidence_list[:60]]
+    # Assign temp IDs for flawless mapping (Claude often mutates raw URLs)
+    for i, e in enumerate(evidence_list[:60]):
+        e["_temp_id"] = str(i)
+        
+    all_payloads = [{"id": e["_temp_id"], "snippet": e.get("key_excerpt") or e.get("snippet") or ""} for e in evidence_list[:60]]
     
     # Process in chunks of 15 to prevent output token truncation
     BATCH_SIZE = 15
@@ -1195,20 +1200,22 @@ async def extract_subjects_with_ai(client: httpx.AsyncClient, evidence_list: lis
         _extract_subjects_batch(client, batch, question) for batch in batches
     ])
     
-    merged: dict[str, dict] = {}
+    merged_by_id: dict[str, dict] = {}
     total_cost = 0.0
     for batch_result, batch_cost in results:
-        merged.update(batch_result)
+        merged_by_id.update(batch_result)
         total_cost += batch_cost
-    
-    # Post-processing: reject any extraction where the subject is a known news wire
+        
+    # Remap back to URL correctly and apply negative filtering
     cleaned: dict[str, dict] = {}
-    for url, data in merged.items():
-        subj_domain = (data.get("subject_domain") or "").lower().strip()
-        if subj_domain and subj_domain not in _NEWS_WIRE_DOMAINS and subj_domain not in _MEDIA_DOMAINS:
-            cleaned[url] = data
-        # else: drop it — AI accidentally set a news wire as subject
-    
+    for e in evidence_list[:60]:
+        _id = e["_temp_id"]
+        if _id in merged_by_id:
+            data = merged_by_id[_id]
+            subj_domain = (data.get("subject_domain") or "").lower().strip()
+            if subj_domain and subj_domain not in _NEWS_WIRE_DOMAINS and subj_domain not in _MEDIA_DOMAINS:
+                cleaned[e["url"]] = data
+            
     return cleaned, total_cost
 
 # ── Step 5: Synthesize final answer (template-based) ─────────────────────────
