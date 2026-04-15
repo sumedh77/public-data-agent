@@ -1283,6 +1283,53 @@ INSTRUCTIONS:
         print(f"Synthesis failed: {e}")
         return f"An error occurred while synthesizing: {str(e)}", 0.0
 
+# ── Step 5b: Generate contextual follow-up suggestions ───────────────────────
+async def generate_follow_ups(client: httpx.AsyncClient, question: str, top_companies: list[str]) -> list[dict]:
+    """Uses Claude Haiku to generate 3 highly contextual follow-up questions."""
+    if not ANTHROPIC_API_KEY:
+        return []
+    companies_str = ", ".join(top_companies[:6]) if top_companies else "the discovered companies"
+    prompt = f"""You are a RevOps intelligence analyst assistant. A user just ran this research query:
+
+QUERY: "{question}"
+
+TOP COMPANIES FOUND: {companies_str}
+
+Generate exactly 3 short, highly specific follow-up research questions that would be the NATURAL NEXT STEP for a B2B salesperson or RevOps analyst after seeing these results. The follow-ups must:
+1. Be directly related to what the user just asked — not generic
+2. Reference the actual companies found OR the theme of the query
+3. Be actionable (e.g., check hiring, check funding, track displacement, monitor new signals)
+4. Each follow-up should have a short display label (under 55 chars) and an emoji
+
+Return ONLY a JSON array:
+[
+  {{"label": "📈 Check if top results are hiring for RevOps roles", "query": "Which of these companies are hiring RevOps or Sales roles: {companies_str}"}},
+  {{"label": "💰 Cross-reference with recent funding rounds", "query": "Which of these companies raised funding in the last 90 days: {companies_str}"}},
+  {{"label": "🎯 Check for Salesforce displacement signals", "query": "Are any of these companies showing CRM displacement signals: {companies_str}"}}
+]"""
+
+    try:
+        resp = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={
+                "model": "claude-3-haiku-20240307",
+                "max_tokens": 500,
+                "system": "Output only valid JSON. No explanation.",
+                "messages": [{"role": "user", "content": prompt}]
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        raw = data.get("content", [{}])[0].get("text", "[]")
+        match = re.search(r'\[.*\]', raw.replace('\n', ''), re.DOTALL)
+        return json.loads(match.group(0)) if match else []
+    except Exception as e:
+        print(f"Follow-up generation failed: {e}")
+        return []
+
+
 # ── Main pipeline ─────────────────────────────────────────────────────────────
 def _infer_max_days(question: str) -> int:
     """
@@ -1722,6 +1769,10 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
                 "evidence":       items,
             })
 
+        # Generate dynamic follow-ups in parallel (non-blocking — fire and await)
+        top_company_names = [c["company_name"] for c in companies_list[:6]]
+        follow_ups = await generate_follow_ups(client, question, top_company_names)
+
         yield sse("done", {
             "question":         question,
             "answer":           answer,
@@ -1729,6 +1780,7 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
             "total_companies":  len(companies_list),
             "total_articles":   sum(len(c["evidence"]) for c in companies_list),
             "elapsed":          elapsed,
+            "follow_ups":       follow_ups,
             "pipeline_stats": {
                 "queries_generated":    len(queries),
                 "urls_discovered":      len(all_results),
@@ -1746,6 +1798,7 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
             },
             "search_queries_used": queries,
         })
+
         
         # Log to DB — Dynamic Per-Provider Costs
         total_q_exa = (len(queries) if use_exa else 0) + (len(round2_queries) if round2_exa else 0)

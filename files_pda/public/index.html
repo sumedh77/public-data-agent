@@ -386,7 +386,19 @@ function renS(){const l=document.getElementById('suggL');l.innerHTML='';SUGGS.fo
 function addU(t){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fm fm-u';d.innerHTML=`<div class="fb fb-u">${esc(t)}</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
 function addA(h){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fm fm-a';d.innerHTML=`<div class="fav"><svg viewBox="0 0 20 20" class="rob" style="width:14px;height:14px"><rect x="4" y="6" width="12" height="9" rx="2"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="12.5" cy="10" r="1.5"/><rect x="8" y="12" width="4" height="1.5" rx=".5"/><rect x="9" y="3" width="2" height="3" rx="1"/></svg></div><div class="fb fb-a">${h}</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
 function addTh(id){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fth';d.id=id;d.innerHTML=`<div class="fth-d"><span></span><span></span><span></span></div><div class="fth-t">Searching the web…</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
-function addFU(){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fm fm-a';d.innerHTML=`<div class="fav" style="background:linear-gradient(135deg,var(--grn),#34d399)"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2" width="10" height="10"><path d="M2 8h12M9 4l4 4-4 4"/></svg></div><div><div class="fu-suggs"><div class="fu-lbl">→ Suggested follow-ups</div><div class="fu-list"><div class="fu-item" onclick="runQ('Find hiring signals at Vitally, Dock, Churnkey, Planhat')">📈 Check if top results are also hiring for CS roles</div><div class="fu-item" onclick="runQ('Which of these companies raised funding recently? Vitally, Dock, Churnkey')">💰 Cross-reference with recent funding rounds</div><div class="fu-item" onclick="runQ('Companies migrating away from Gainsight, Totango, or ChurnZero')">🎯 Search for displacement signals in CS tools</div></div></div></div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
+function addFU(followUps){
+  const m=document.getElementById('msgs'),d=document.createElement('div');
+  d.className='fm fm-a';
+  // Use AI-generated follow-ups if available, else sensible defaults
+  const items = (followUps && followUps.length > 0) ? followUps : [
+    {label:'📈 Check hiring signals at top results', query:'Which of the top results are hiring for Sales or RevOps roles?'},
+    {label:'💰 Cross-reference with recent funding', query:'Which of the top results raised funding in the last 90 days?'},
+    {label:'🎯 Look for displacement signals', query:'Are any of the top results switching CRM or data tools?'}
+  ];
+  const fuHtml = items.map(f=>`<div class="fu-item" onclick="runQ(${JSON.stringify(f.query)})">${esc(f.label)}</div>`).join('');
+  d.innerHTML=`<div class="fav" style="background:linear-gradient(135deg,var(--grn),#34d399)"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2" width="10" height="10"><path d="M2 8h12M9 4l4 4-4 4"/></svg></div><div><div class="fu-suggs"><div class="fu-lbl">→ Suggested follow-ups</div><div class="fu-list">${fuHtml}</div></div></div>`;
+  m.appendChild(d);m.scrollTop=m.scrollHeight
+}
 function rPh(p){const e=document.getElementById('ph-'+p);if(!e)return;e.className='fp-p';const i=e.querySelector('.ph-ico,.fp-spin,.fp-ok');if(i){i.className='ph-ico';i.textContent='·'}}
 function sPh(p,s){const e=document.getElementById('ph-'+p);if(!e)return;e.className='fp-p '+(s||'');const i=e.querySelector('.ph-ico,.fp-spin,.fp-ok');if(!i)return;if(s==='running'){const x=document.createElement('div');x.className='fp-spin';i.replaceWith(x)}else if(s==='done'){const c=e.querySelector('.fp-spin')||e.querySelector('.ph-ico');if(c){const o=document.createElement('span');o.className='fp-ok';o.textContent='✓';c.replaceWith(o)}}}
 function sLg(m){const e=document.getElementById('lg');if(e)e.textContent=m}
@@ -471,12 +483,15 @@ async function runQ(q){
               <p style="margin-top:4px;font-size:11px;color:var(--tm)">${n} signals collected. ${san.rejected ? `🛡 ${san.rejected} stale results removed.` : ''}</p>`;
             addA(msg);
             
-            if(n > 0) addFU();
+            if(n > 0) addFU(data.follow_ups);
             const el=document.getElementById('elap');
             if(data.elapsed) {
                 el.textContent=`${data.elapsed}s`;
                 el.style.display='inline';
             }
+            // Detect if this is a GitHub-mode query → use simple 2-col table
+            const ghMode = /github|git\s*hub|gh\s+button|github\s+link/i.test(data.question||'');
+            if(ghMode) { renderGithubTable(data.companies||[]); }
             // Auto-trigger GitHub check for all discovered domains
             const domains = [...new Set((data.companies||[]).map(c=>c.company_domain).filter(Boolean))];
             if(domains.length > 0) checkGithubDomains(domains);
@@ -504,10 +519,12 @@ function togG(d){if(exG.has(d))exG.delete(d);else exG.add(d);renT(aR)}
 function evC(r,sub){
   const sc=r.conf,scC=sc>=.7?'sc-hi':sc>=.45?'sc-md':'sc-lo';
   const ct=(r.ct||'').toLowerCase(),ctC=ct.includes('blog')?'ct-blog':ct.includes('ann')?'ct-ann':ct.includes('case')?'ct-cs':(ct.includes('guide')||ct.includes('play'))?'ct-guide':'ct-other',ctL=ct?ct.replace(' post',''):'article';
-  const{dt,rc,rl,v}=r.di;const ex=(r.ke||r.title||'').slice(0,sub?100:140);const u=r.url||'',ud=u.replace(/^https?:\/\/(www\.)?/,'').slice(0,34);const ns=r.nsd||domOf(u);const n=nxS(r);
+  const{dt,rc,rl,v}=r.di;const fullExcerpt=r.ke||r.title||'';const ex=fullExcerpt.slice(0,sub?100:140);const u=r.url||'',ud=u.replace(/^https?:\/\/(www\.)?/,'').slice(0,34);const ns=r.nsd||domOf(u);const n=nxS(r);
   let dc=v&&dt?`<div class="dt-m">${esc(dt)}</div><span class="dt-r ${rc}">${esc(rl)}</span>`:`<span style="font-family:var(--mono);font-size:8px;color:#c2410c">⚠ unverified</span>`;
   const sd=sub?`<td style="padding-left:8px;border-left:2px solid var(--border)"><span style="font-family:var(--mono);font-size:9px;color:var(--tm)">${esc(ns)}</span></td>`:`<td><div class="co-w"><img src="https://www.google.com/s2/favicons?domain=${ns}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-f"/><div class="co-n" style="color:var(--ts);font-size:10.5px">${esc(ns)}</div></div></td>`;
-  return`${sd}<td><span class="ct-b ${ctC}">${esc(ctL)}</span></td><td><div class="sig-t">${esc(ex)}</div></td><td><span class="sc-p ${scC}">${Math.round(sc*100)}%</span></td><td>${dc}</td><td id="gh-${sub?'s':'m'}-${(r.cd||domOf(r.url||'')).replace(/\./g,'-')}"><span style="font-family:var(--mono);font-size:9px;color:var(--tm)">…</span></td><td><a href="${esc(u)}" target="_blank" onclick="event.stopPropagation()" class="pu" title="${esc(u)}" style="text-decoration:none;">${esc(ud)}${ud.length>=34?'…':''}</a></td><td><span class="ns-p ${n.c}">${n.i} ${esc(n.a)}</span></td>`}
+  // Signal cell: truncated display with full text tooltip + link to proof URL
+  const sigCell=`<td><a href="${esc(u)}" target="_blank" onclick="event.stopPropagation()" style="text-decoration:none;color:inherit;display:block" title="${esc(fullExcerpt)}"><div class="sig-t" style="cursor:pointer">${esc(ex)}${fullExcerpt.length>140?'…':''}</div></a></td>`;
+  return`${sd}<td><span class="ct-b ${ctC}">${esc(ctL)}</span></td>${sigCell}<td><span class="sc-p ${scC}">${Math.round(sc*100)}%</span></td><td>${dc}</td><td id="gh-${sub?'s':'m'}-${(r.cd||domOf(r.url||'')).replace(/\./g,'-')}"><span style="font-family:var(--mono);font-size:9px;color:var(--tm)">…</span></td><td><a href="${esc(u)}" target="_blank" onclick="event.stopPropagation()" class="pu" title="${esc(u)}" style="text-decoration:none;">${esc(ud)}${ud.length>=34?'…':''}</a></td><td><span class="ns-p ${n.c}">${n.i} ${esc(n.a)}</span></td>`}
 
 function renT(rows){
   const tb=document.getElementById('tb');tb.innerHTML='';
@@ -527,6 +544,33 @@ function renRes(data){aR=[];fD=[];for(const co of(data.companies||[]))for(const 
 function dl(){if(!fD.length)return;const h=['Company','Domain','Title','Type','Signal','Score','Date','URL'];const r=fD.map(x=>[x.cn,x.cd,x.title,x.ct,(x.ke||'').replace(/[\n\r]+/g,' '),Math.round(x.conf*100)+'%',x.date,x.url]);const c=[h,...r].map(x=>x.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));a.download=`open-signals-${new Date().toISOString().slice(0,10)}.csv`;document.body.appendChild(a);a.click();document.body.removeChild(a)}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function domOf(u){const m=(u||'').match(/https?:\/\/(?:www\.)?([^/]+)/);return m?m[1].toLowerCase():''}
+
+// ── GitHub simple table mode ─────────────────────────────────────────────────
+function renderGithubTable(companies) {
+  // Override the full table with a clean 2-col Domain + GitHub layout
+  const tsc = document.getElementById('tsc');
+  const tb  = document.getElementById('tb');
+  // Replace table headers
+  const thead = tsc.querySelector('thead tr');
+  if(thead) thead.innerHTML = '<th>Company</th><th>Domain</th><th>GitHub Present</th><th>GitHub Link</th>';
+  tb.innerHTML = '';
+  companies.forEach(co => {
+    const tr = document.createElement('tr');
+    tr.style.cssText = 'background:var(--white)';
+    tr.onmouseover = () => tr.style.background = 'var(--prl)';
+    tr.onmouseout  = () => tr.style.background  = 'var(--white)';
+    const d = co.company_domain || '';
+    const name = co.company_name || d;
+    const safeId = d.replace(/\./g, '-');
+    tr.innerHTML = `
+      <td><div class="co-w"><img src="https://www.google.com/s2/favicons?domain=${esc(d)}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-f"/><div class="co-n">${esc(name)}</div></div></td>
+      <td><span style="font-family:var(--mono);font-size:10px;color:var(--pri)">${esc(d)}</span></td>
+      <td id="gh-m-${safeId}"><span style="font-family:var(--mono);font-size:9px;color:var(--tm)">…</span></td>
+      <td id="ghl-${safeId}"><span style="font-family:var(--mono);font-size:9px;color:var(--tm)">—</span></td>`;
+    tb.appendChild(tr);
+  });
+  tsc.style.display = 'block';
+}
 
 // ── GitHub presence checker ───────────────────────────────────────────────────
 async function checkGithubDomains(domains) {

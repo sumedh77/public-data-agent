@@ -6,6 +6,7 @@ No internal data. Public internet only.
 import asyncio
 import datetime
 import json
+import math
 import re
 import time
 import sqlite3
@@ -340,6 +341,60 @@ _INTENT_WORDS = {
     'please', 'can', 'could', 'would', 'should',
 }
 
+# ── Query Intent Parser ───────────────────────────────────────────────────────
+# Detects requested result count and entity type from the user's question.
+# Drives numResults on Exa and max_results on Parallel AI, plus startup filtering.
+
+_STARTUP_SIGNALS = {
+    "startup", "startups", "seed", "early-stage", "early stage",
+    "pre-seed", "series a", "series b", "founded", "new company",
+    "young company", "small company", "bootstrapped", "vc-backed",
+}
+_ENTERPRISE_SIGNALS = {
+    "enterprise", "fortune 500", "large company", "big company",
+    "publicly traded", "public company", "corporation", "conglomerate",
+}
+
+# Regex that matches startup signals inside scraped page content
+_STARTUP_CONTENT_RE = re.compile(
+    r'\b(seed\s+round|series\s+[abc]|early[- ]stage|founded\s+in\s+20\d\d|'
+    r'we\s+raised|pre[- ]seed|angel\s+round|y\s*combinator|'
+    r'\d+\s+employees?|small\s+team|our\s+team\s+of\s+\d+)\b',
+    re.IGNORECASE,
+)
+
+def _parse_query_intent(question: str) -> dict:
+    """
+    Extract from the user's question:
+      - requested_count : int  — explicit number of results (0 = unspecified)
+      - entity_type     : str  — "startup" | "enterprise" | "company"
+      - startup_filter  : bool — True when post-scrape startup signal check is needed
+    """
+    q_lower = question.lower()
+
+    # Count: "300 companies", "50 startups", "find 100 results"
+    count_m = re.search(
+        r'\b(\d{1,4})\s*(?:companies|startups?|results?|firms?|organizations?)\b', q_lower
+    )
+    if not count_m:
+        count_m = re.search(r'\bfind\s+(\d{1,4})\b', q_lower)
+    requested_count = int(count_m.group(1)) if count_m else 0
+
+    is_startup    = any(sig in q_lower for sig in _STARTUP_SIGNALS)
+    is_enterprise = any(sig in q_lower for sig in _ENTERPRISE_SIGNALS)
+    entity_type   = "startup" if is_startup else ("enterprise" if is_enterprise else "company")
+
+    return {
+        "requested_count": requested_count,
+        "entity_type":     entity_type,
+        "startup_filter":  is_startup,
+    }
+
+def _is_startup_content(content: str) -> bool:
+    """Return True if scraped page contains at least one startup signal."""
+    return bool(_STARTUP_CONTENT_RE.search(content[:3000]))
+
+
 def _extract_keywords(text: str) -> list[str]:
     words = re.sub(r'[^\w\s]', '', text.lower()).split()
     return [w for w in words if w not in _STOP_WORDS and len(w) > 2]
@@ -354,7 +409,7 @@ def _extract_topic_keywords(text: str) -> list[str]:
             and not w.isdigit()]
 
 # ── Step 1: Derive search queries ─────────────────────────────────────────────
-def derive_search_queries(question: str) -> list[str]:
+def derive_search_queries(question: str, entity_type: str = "company") -> list[str]:
     """
     Generate 10 targeted search queries from the question.
 
@@ -427,6 +482,21 @@ def derive_search_queries(question: str) -> list[str]:
     # 15. Comparison / Alternative pattern
     queries.append(f'{core} "alternative to" OR "comparison" OR "vs" blog {cur_year}')
 
+    # ── Entity-type query injection ──────────────────────────────────────────────
+    # Prepend highly targeted entity-specific queries so they rank first (Exa
+    # and PAI both receive queries in order — top queries carry more weight).
+    if entity_type == "startup":
+        queries = [
+            f'{core} startup seed early-stage company {cur_year}',
+            f'{core} YC "series A" OR "seed round" OR "pre-seed" {cur_year}',
+            f'"we are a startup" {core} blog {cur_year}',
+        ] + queries
+    elif entity_type == "enterprise":
+        queries = [
+            f'{core} enterprise "Fortune 500" OR "large company" OR "publicly traded" {cur_year}',
+            f'{core} corporation "investor relations" OR "annual report" {cur_year}',
+        ] + queries
+
     # Deduplicate while preserving order
     seen: set[str] = set()
     unique = []
@@ -437,64 +507,115 @@ def derive_search_queries(question: str) -> list[str]:
 
     return unique[:15]
 
-# ── Step 2a: Parallel AI Search ───────────────────────────────────────────────
-async def search_parallel_ai(client: httpx.AsyncClient, queries: list[str]) -> list[dict]:
-    """Run all queries in parallel via Parallel AI Search API."""
-    async def _one(q: str) -> list[dict]:
-        try:
-            resp = await client.post(
-                f"{PARALLEL_AI_URL}/v1beta/search",
-                headers={"x-api-key": PARALLEL_AI_KEY, "Content-Type": "application/json"},
-                json={"objective": q, "mode": "fast", "excerpts": {"max_chars_per_result": 600}},
-                timeout=30,
+# ── Step 2a: Parallel AI Search (agentic mode) ────────────────────────────────
+async def search_parallel_ai(
+    client: httpx.AsyncClient,
+    queries: list[str],
+    requested_count: int = 0,
+) -> list[dict]:
+    """
+    Single agentic-mode call to Parallel AI Search.
+    Sends the top 5 most targeted queries as search_queries[] — agentic mode
+    reasons across all of them and returns richer, deduplicated results.
+
+    Field mapping fix (PAI actual response):
+      publish_date  → date
+      excerpts[]    → snippet  (array, not a string)
+    """
+    if not queries:
+        return []
+
+    # Top 5 most targeted queries for agentic mode
+    top_queries = queries[:5]
+
+    # Scale max_results to what the user asked for (cap at 100)
+    max_results = min(max(requested_count, 20), 100) if requested_count > 0 else 20
+
+    # The raw question (first query) is the objective
+    objective = queries[0]
+
+    try:
+        resp = await client.post(
+            f"{PARALLEL_AI_URL}/v1beta/search",
+            headers={"x-api-key": PARALLEL_AI_KEY, "Content-Type": "application/json"},
+            json={
+                "mode":           "agentic",
+                "search_queries": top_queries,
+                "max_results":    max_results,
+                "objective":      objective,
+                "excerpts":       {"max_chars_per_result": 2000},
+            },
+            timeout=90,   # agentic mode is deeper — needs more time than fast mode
+        )
+        resp.raise_for_status()
+        out = []
+        for r in resp.json().get("results", []):
+            url   = r.get("url", "")
+            title = r.get("title", "") or r.get("name", "")
+            src_domain = extract_domain_from_url(url)
+            co_name    = extract_company_from_title(title)
+
+            # PAI returns excerpts as an array — join first 2 for richer snippet
+            excerpts = r.get("excerpts") or []
+            snippet  = " … ".join(excerpts[:2]) if excerpts else (
+                r.get("excerpt") or r.get("snippet") or ""
             )
-            resp.raise_for_status()
-            out = []
-            for r in resp.json().get("results", []):
-                url = r.get("url", "")
-                title = r.get("title", "") or r.get("name", "")
-                src_domain = extract_domain_from_url(url)
-                co_name    = extract_company_from_title(title)
-                out.append({
-                    "url":               url,
-                    "domain":            src_domain,
-                    "news_source_domain": src_domain,
-                    "title":             title,
-                    "date":              (r.get("date") or r.get("publishedDate") or "")[:10],
-                    "snippet":           (r.get("excerpt") or r.get("snippet") or "")[:500],
-                    "company_name":      co_name,
-                    "company_domain":    _resolve_company_domain(co_name, src_domain),
-                    "source":            "parallel_ai",
-                })
-            return out
-        except Exception:
-            return []
 
-    batches = await asyncio.gather(*[_one(q) for q in queries])
-    flat = [r for b in batches for r in b]
-    seen: set[str] = set()
-    return [r for r in flat if r["url"] not in seen and not seen.add(r["url"])]  # type: ignore[func-returns-value]
+            out.append({
+                "url":                url,
+                "domain":             src_domain,
+                "news_source_domain": src_domain,
+                "title":              title,
+                # PAI returns publish_date, with date/publishedDate as fallbacks
+                "date":               (r.get("publish_date") or r.get("date") or r.get("publishedDate") or "")[:10],
+                "snippet":            snippet[:500],
+                "company_name":       co_name,
+                "company_domain":     _resolve_company_domain(co_name, src_domain),
+                "source":             "parallel_ai",
+            })
+        return out
+    except Exception as e:
+        print(f"PAI agentic search error: {e}")
+        return []
 
-# ── Step 2b: Exa Search ───────────────────────────────────────────────────────
-async def search_exa(client: httpx.AsyncClient, queries: list[str], max_days: int = 180) -> list[dict]:
-    """Run all queries in parallel via Exa Search API with date filtering."""
+# ── Step 2b: Exa Search (deep-lite model) ────────────────────────────────────
+async def search_exa(
+    client: httpx.AsyncClient,
+    queries: list[str],
+    max_days: int = 180,
+    requested_count: int = 0,
+) -> list[dict]:
+    """
+    Run all queries in parallel via Exa deep-lite model with date filtering.
 
-    # Convert max_days to ISO date string for Exa's startPublishedDate filter
+    deep-lite uses Exa's deep learning retrieval model for higher quality results.
+    Highlights use maxCharacters (not numSentences) — returns richer text per URL.
+
+    For large requested_count (> 100): Exa caps at 100 per call, so we run
+    ceil(requested_count / 100) batches across queries, then deduplicate.
+    """
+    EXA_MAX_PER_CALL = 100
     start_date = (datetime.date.today() - datetime.timedelta(days=max_days)).isoformat()
 
-    async def _one(q: str, use_neural: bool = False) -> list[dict]:
+    # How many results to request per API call
+    if requested_count > EXA_MAX_PER_CALL:
+        num_results = EXA_MAX_PER_CALL
+    elif requested_count > 0:
+        num_results = max(requested_count, 40)
+    else:
+        num_results = 40  # default
+
+    async def _one(q: str) -> list[dict]:
         try:
             payload: dict = {
-                "query":       q,
-                "type":        "neural" if use_neural else "auto",
-                "num_results": 40,
+                "query":              q,
+                "type":               "deep-lite",
+                "numResults":         num_results,
                 "startPublishedDate": start_date + "T00:00:00.000Z",
-                # Match the AI SDK agent: 3 highlights per URL, 3 sentences each.
-                # This gives us 3× more extractable signals per page vs single highlight.
+                "outputSchema":       {"type": "text"},
                 "contents": {
                     "highlights": {
-                        "numSentences":    3,
-                        "highlightsPerUrl": 3,
+                        "maxCharacters": 4000,
                     }
                 },
             }
@@ -502,7 +623,7 @@ async def search_exa(client: httpx.AsyncClient, queries: list[str], max_days: in
                 EXA_URL,
                 headers={"x-api-key": EXA_API_KEY, "Content-Type": "application/json"},
                 json=payload,
-                timeout=25,
+                timeout=30,
             )
             resp.raise_for_status()
             out = []
@@ -510,7 +631,6 @@ async def search_exa(client: httpx.AsyncClient, queries: list[str], max_days: in
                 url        = r.get("url", "")
                 title      = r.get("title", "")
                 highlights = r.get("highlights") or []
-                # Join all 3 highlights into one rich snippet — richer signal for extraction
                 rich_snippet = " … ".join(h for h in highlights if h)[:800]
                 src_domain = extract_domain_from_url(url)
                 co_name    = extract_company_from_title(title)
@@ -524,20 +644,24 @@ async def search_exa(client: httpx.AsyncClient, queries: list[str], max_days: in
                     "company_name":       co_name,
                     "company_domain":     _resolve_company_domain(co_name, src_domain),
                     "source":             "exa",
-                    # Store individual highlights for richer evidence extraction
                     "_highlights":        highlights,
                 })
             return out
         except Exception:
             return []
 
-    # Alternate neural / auto — mirrors the AI SDK agent's "diverse queries" approach
-    tasks = []
-    for i, q in enumerate(queries):
-        tasks.append(_one(q, use_neural=(i % 2 == 1)))
+    # Build task list — all queries run in parallel
+    tasks = [_one(q) for q in queries]
+
+    # For large counts (> 100): we need more query batches to surface enough unique results.
+    # Take the top 3 sharpest queries and run them again as extra sweep batches.
+    if requested_count > EXA_MAX_PER_CALL:
+        extra_batches = math.ceil(requested_count / EXA_MAX_PER_CALL) - 1
+        for _ in range(min(extra_batches, 2)):   # max 3 total sweeps (300 results)
+            tasks.extend([_one(q) for q in queries[:3]])
 
     batches = await asyncio.gather(*tasks)
-    flat = [r for b in batches for r in b]
+    flat    = [r for b in batches for r in b]
     seen: set[str] = set()
     return [r for r in flat if r["url"] not in seen and not seen.add(r["url"])]  # type: ignore[func-returns-value]
 
@@ -1159,6 +1283,53 @@ INSTRUCTIONS:
         print(f"Synthesis failed: {e}")
         return f"An error occurred while synthesizing: {str(e)}", 0.0
 
+# ── Step 5b: Generate contextual follow-up suggestions ───────────────────────
+async def generate_follow_ups(client: httpx.AsyncClient, question: str, top_companies: list[str]) -> list[dict]:
+    """Uses Claude Haiku to generate 3 highly contextual follow-up questions."""
+    if not ANTHROPIC_API_KEY:
+        return []
+    companies_str = ", ".join(top_companies[:6]) if top_companies else "the discovered companies"
+    prompt = f"""You are a RevOps intelligence analyst assistant. A user just ran this research query:
+
+QUERY: "{question}"
+
+TOP COMPANIES FOUND: {companies_str}
+
+Generate exactly 3 short, highly specific follow-up research questions that would be the NATURAL NEXT STEP for a B2B salesperson or RevOps analyst after seeing these results. The follow-ups must:
+1. Be directly related to what the user just asked — not generic
+2. Reference the actual companies found OR the theme of the query
+3. Be actionable (e.g., check hiring, check funding, track displacement, monitor new signals)
+4. Each follow-up should have a short display label (under 55 chars) and an emoji
+
+Return ONLY a JSON array:
+[
+  {{"label": "📈 Check if top results are hiring for RevOps roles", "query": "Which of these companies are hiring RevOps or Sales roles: {companies_str}"}},
+  {{"label": "💰 Cross-reference with recent funding rounds", "query": "Which of these companies raised funding in the last 90 days: {companies_str}"}},
+  {{"label": "🎯 Check for Salesforce displacement signals", "query": "Are any of these companies showing CRM displacement signals: {companies_str}"}}
+]"""
+
+    try:
+        resp = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={
+                "model": "claude-3-haiku-20240307",
+                "max_tokens": 500,
+                "system": "Output only valid JSON. No explanation.",
+                "messages": [{"role": "user", "content": prompt}]
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        raw = data.get("content", [{}])[0].get("text", "[]")
+        match = re.search(r'\[.*\]', raw.replace('\n', ''), re.DOTALL)
+        return json.loads(match.group(0)) if match else []
+    except Exception as e:
+        print(f"Follow-up generation failed: {e}")
+        return []
+
+
 # ── Main pipeline ─────────────────────────────────────────────────────────────
 def _infer_max_days(question: str) -> int:
     """
@@ -1270,6 +1441,12 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
     t0 = time.time()
     max_days = _infer_max_days(question)
 
+    # ── Parse query intent (count + entity type) ──────────────────────────────
+    intent          = _parse_query_intent(question)
+    requested_count = intent["requested_count"]
+    entity_type     = intent["entity_type"]
+    startup_filter  = intent["startup_filter"]
+
     yield sse("start", {"question": question, "msg": "Starting public research pipeline…"})
 
     limits = httpx.Limits(max_connections=12, max_keepalive_connections=6)
@@ -1295,9 +1472,23 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
         
         # Fallback to python regex generator if Claude failed to output list
         if not ai_queries or not isinstance(ai_queries, list):
-            queries = derive_search_queries(question)
+            queries = derive_search_queries(question, entity_type=entity_type)
         else:
             queries = ai_queries
+
+        # Surface intent to the frontend
+        if requested_count > 0 or entity_type != "company":
+            yield sse("phase", {
+                "phase": "intent",
+                "requested_count": requested_count,
+                "entity_type":     entity_type,
+                "startup_filter":  startup_filter,
+                "msg": (
+                    f"Intent detected — "
+                    + (f"targeting {requested_count} results · " if requested_count else "")
+                    + f"entity type: {entity_type}"
+                ),
+            })
 
         yield sse("phase", {"phase": "query_generation", "status": "done",
                              "queries": queries, "msg": f"Generated {len(queries)} search queries"})
@@ -1314,9 +1505,9 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
         async def _noop() -> list: return []
 
         pai_results, exa_results, sec_results = await asyncio.gather(
-            search_parallel_ai(client, queries)              if use_pai else _noop(),
-            search_exa(client, queries, max_days=max_days)  if use_exa else _noop(),
-            search_sec_edgar(client, queries, max_days=max_days) if use_sec else _noop(),
+            search_parallel_ai(client, queries, requested_count=requested_count)              if use_pai else _noop(),
+            search_exa(client, queries, max_days=max_days, requested_count=requested_count)  if use_exa else _noop(),
+            search_sec_edgar(client, queries, max_days=max_days)                             if use_sec else _noop(),
         )
 
         def _merge_dedup(lists: list[list[dict]]) -> list[dict]:
@@ -1354,8 +1545,8 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
                                  "msg": f"Round 2 — only {len(unique_domains_r1)} domains, re-searching {' + '.join(active_r2) or 'no providers'}…"})
             # Respect routing decisions — don't force-enable providers that were routed off
             round2_pai, round2_exa = await asyncio.gather(
-                search_parallel_ai(client, round2_queries) if use_pai else _noop(),
-                search_exa(client, round2_queries, max_days=max_days) if use_exa else _noop(),
+                search_parallel_ai(client, round2_queries, requested_count=requested_count) if use_pai else _noop(),
+                search_exa(client, round2_queries, max_days=max_days, requested_count=requested_count) if use_exa else _noop(),
             )
             all_results = _merge_dedup([all_results, round2_pai, round2_exa])
 
@@ -1437,14 +1628,27 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
         # Sort snippets by confidence DESC — top ones get full Firecrawl treatment
         snippet_evidence.sort(key=lambda x: x["confidence"], reverse=True)
 
-        # ── Phase 3b: Firecrawl — only top 20 by snippet confidence ──
-        # We already have snippet scores for everyone. Firecrawl just enriches the top 20.
-        FIRECRAWL_CAP = 40
+        # ── Phase 3b: Firecrawl — scrape top N by snippet confidence ─────────
+        # Scale the cap to match the user's requested count (min 40, max 120).
+        FIRECRAWL_CAP  = min(max(requested_count, 40), 120) if requested_count > 0 else 40
         urls_to_scrape = [se["url"] for se in snippet_evidence[:FIRECRAWL_CAP]]
         yield sse("phase", {"phase": "scraping", "status": "running",
                              "msg": f"Deep-scraping top {len(urls_to_scrape)} highest-confidence pages via Firecrawl…"})
         scraped, fc_pages, pai_extract_pages = await scrape_urls(client, urls_to_scrape)
         pai_extract_cost = COST_PAI_RESULT * pai_extract_pages  # PAI Extract per-page cost
+
+        # ── Startup filter: drop scraped pages with no startup signals ──────────
+        # Only applied when the user explicitly asked for startups.
+        # We keep pages that either (a) contain a startup signal, or (b) couldn't
+        # be scraped — snippet-only results pass through and are filtered later.
+        if startup_filter and scraped:
+            before = len(scraped)
+            scraped = {url: content for url, content in scraped.items()
+                       if _is_startup_content(content)}
+            dropped = before - len(scraped)
+            if dropped:
+                print(f"Startup filter: dropped {dropped} non-startup pages, kept {len(scraped)}")
+
         yield sse("phase", {"phase": "scraping", "status": "done",
                              "msg": (f"Scraped {len(scraped)} pages "
                                      f"(Firecrawl: {fc_pages}, PAI-Extract fallback: {pai_extract_pages}) "
@@ -1565,6 +1769,10 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
                 "evidence":       items,
             })
 
+        # Generate dynamic follow-ups in parallel (non-blocking — fire and await)
+        top_company_names = [c["company_name"] for c in companies_list[:6]]
+        follow_ups = await generate_follow_ups(client, question, top_company_names)
+
         yield sse("done", {
             "question":         question,
             "answer":           answer,
@@ -1572,6 +1780,7 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
             "total_companies":  len(companies_list),
             "total_articles":   sum(len(c["evidence"]) for c in companies_list),
             "elapsed":          elapsed,
+            "follow_ups":       follow_ups,
             "pipeline_stats": {
                 "queries_generated":    len(queries),
                 "urls_discovered":      len(all_results),
@@ -1589,6 +1798,7 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
             },
             "search_queries_used": queries,
         })
+
         
         # Log to DB — Dynamic Per-Provider Costs
         total_q_exa = (len(queries) if use_exa else 0) + (len(round2_queries) if round2_exa else 0)
