@@ -77,12 +77,12 @@ COST_PAI_RESULT = 0.0002
 COST_SEC_BASE = 0.0      # Free — SEC EFTS API
 COST_SEC_RESULT = 0.0    # Free — SEC EFTS API
 COST_FC_SUCCESS = 0.002
-# Claude 3 Haiku pricing (all LLM calls use claude-3-haiku-20240307)
+# Claude 3 Haiku pricing — used for fast/cheap calls (routing, intent, follow-ups)
 COST_HAIKU_IN_PER_1M  = 0.25
 COST_HAIKU_OUT_PER_1M = 1.25
-# Legacy aliases — do NOT use for new code
-COST_SONNET_IN_PER_1M  = COST_HAIKU_IN_PER_1M
-COST_SONNET_OUT_PER_1M = COST_HAIKU_OUT_PER_1M
+# Claude 3.5 Sonnet pricing — used for synthesis and signal extraction (quality matters)
+COST_SONNET_IN_PER_1M  = 3.00
+COST_SONNET_OUT_PER_1M = 15.00
 
 def log_query_metrics(query: str, tools_used: dict, llm_cost: float,
                       exa_cost: float, pai_cost: float, sec_cost: float, fc_cost: float,
@@ -1564,22 +1564,23 @@ Snippets:
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
             json={
-                "model": "claude-3-haiku-20240307",
-                "max_tokens": 2500,
+                "model": "claude-3-5-sonnet-20241022",
+                "max_tokens": 3000,
                 "system": (
                     "Output only valid JSON. "
                     "Never use news wires or aggregators as subject_company. "
                     "Always name the specific person and title if present. "
-                    "aligned_signal must end with 'Proof: [url]'."
+                    "aligned_signal must end with 'Proof: [url]'. "
+                    "Include all concrete specifics: dollar amounts, tool names, team sizes, percentages."
                 ),
                 "messages": [{"role": "user", "content": prompt}]
             },
-            timeout=30,
+            timeout=45,
         )
         data = resp.json()
         usage    = data.get("usage", {})
-        ai_cost  = (usage.get("input_tokens", 0) / 1_000_000) * COST_HAIKU_IN_PER_1M \
-                 + (usage.get("output_tokens", 0) / 1_000_000) * COST_HAIKU_OUT_PER_1M
+        ai_cost  = (usage.get("input_tokens", 0) / 1_000_000) * COST_SONNET_IN_PER_1M \
+                 + (usage.get("output_tokens", 0) / 1_000_000) * COST_SONNET_OUT_PER_1M
         raw_text = data.get("content", [{}])[0].get("text", "{}")
         json_match = re.search(r'\{.*\}', raw_text.replace('\n', ''), re.DOTALL)
         res = json.loads(json_match.group(0)) if json_match else json.loads(raw_text)
@@ -1647,47 +1648,100 @@ async def extract_subjects_with_ai(
 
     return cleaned, total_cost
 
-# ── Step 5: Synthesize final answer (template-based) ─────────────────────────
-async def synthesize_answer(client: httpx.AsyncClient, question: str, evidence_by_company: dict) -> tuple[str, float]:
-    """Uses Claude 3.5 Sonnet to build a high-quality intelligence summary from the evidence."""
+# ── Step 5: Synthesize final answer ──────────────────────────────────────────
+async def synthesize_answer(
+    client: httpx.AsyncClient,
+    question: str,
+    evidence_by_company: dict,
+    revops_context: dict | None = None,
+) -> tuple[str, float]:
+    """
+    Uses Claude 3.5 Sonnet to produce a tiered, Opus-quality intelligence report.
+    Each entry includes the specific person + action + Signal Type + Outreach Angle.
+    """
     if not evidence_by_company:
         return f"No direct public evidence found for: {question}", 0.0
 
-    # Limit context size for synthesis to avoid timeout - sort by max confidence
+    persona      = (revops_context or {}).get("buyer_persona", "RevOps professional")
+    use_case     = (revops_context or {}).get("use_case", "B2B intelligence gathering")
+    signal_focus = (revops_context or {}).get("signal_focus", "specific action taken and by whom")
+
+    # Sort by max confidence, pick top companies with richest signals
     sorted_companies = sorted(
-        evidence_by_company.items(), 
-        key=lambda kv: max((ev.get("confidence", 0) for ev in kv[1]), default=0), 
-        reverse=True
+        evidence_by_company.items(),
+        key=lambda kv: max((ev.get("confidence", 0) for ev in kv[1]), default=0),
+        reverse=True,
     )
-    
+
     companies_data = []
-    for domain, items in sorted_companies[:10]: # Top 10 strongest companies
+    for domain, items in sorted_companies[:20]:  # Top 20 companies
         ev_list = []
-        for ev in items[:3]: # Top 3 signals per company
+        for ev in items[:5]:  # Top 5 signals per company
             ev_list.append({
-                "source": ev.get("news_source_domain"),
-                "date": ev.get("date"),
-                "signal": ev.get("summary"),
-                "url": ev.get("url")
+                "signal":       ev.get("signal") or ev.get("key_excerpt", "")[:300],
+                "person":       f"{ev.get('person_name', '')} {ev.get('person_title', '')}".strip(),
+                "date":         ev.get("published_date") or ev.get("date", ""),
+                "proof_url":    ev.get("proof_url") or ev.get("url", ""),
+                "source":       ev.get("news_source_domain", ""),
+                "content_type": ev.get("content_type", ""),
+                "confidence":   ev.get("confidence", 0.5),
             })
         companies_data.append({
-            "domain": domain,
-            "name": items[0].get("company_name") or domain,
-            "signals": ev_list
+            "company":  items[0].get("company_name") or domain,
+            "domain":   domain,
+            "signals":  ev_list,
         })
 
-    prompt = f"""You are a senior intelligence analyst. Synthesize a brief summary of the evidence below.
+    prompt = f"""You are a senior GTM intelligence analyst producing a briefing for a {persona}.
+Their goal: {use_case}
+Signal focus: {signal_focus}
 
-QUERY: {question}
+RESEARCH QUERY: "{question}"
 
-EVIDENCE DATA:
+RAW EVIDENCE ({len(companies_data)} companies):
 {json.dumps(companies_data, indent=2)}
 
-INSTRUCTIONS:
-1. Provide a VERY BRIEF 2-3 sentence summary of the key findings.
-2. Group trends if applicable (e.g., "Several fintech startups have recently...").
-3. Use a professional, objective tone, but keep it extremely short. Do not list companies exhaustively.
-4. Return ONLY the report text. No intro/outro."""
+---
+
+YOUR TASK: Write a rich, tiered intelligence report in markdown. Model your output on this exact structure:
+
+## [1-line summary of the key finding pattern across all results]
+
+---
+
+## Tier 1: Highest-signal entries (named person + company + specific action + date)
+For each entry in Tier 1:
+**N. [Company Name] — [Specific action] ([Date if known])**
+[2-3 sentences with the specific detail: person name & title if available, exact action taken, any dollar amounts / tool names / team sizes / percentages mentioned. Quote briefly if the signal text contains a first-person statement.]
+
+**Signal type:** [e.g., Vendor replacement / Framework migration / New hire / Funding / Product launch]
+**Outreach angle:** [1 crisp sentence — the specific conversation to open, e.g., "They just replaced X with Y — lead with multi-vendor abstraction story."]
+
+---
+
+## Tier 2: Team-level patterns (documented migrations/decisions without named individuals)
+Same format but shorter — 2-3 entries showing pattern-level signals.
+
+---
+
+## Tier 3: Structural signals (company-level signals, no specific person named)
+List remaining companies in a tight 1-sentence-each format: Company — what they did — why it matters.
+
+---
+
+## How to prioritize outreach
+[3-4 bullet points ranking the Tier 1 companies by urgency and suggesting the hook for each]
+
+---
+
+RULES:
+- Every Tier 1 entry MUST include a Proof URL from the evidence (format: [Source](url))
+- If a signal field ends with "Proof: [url]" — extract and use that URL as the clickable source link
+- Never repeat a company across tiers
+- If evidence is thin for a company, put it in Tier 3 — do not inflate weak signals to Tier 1
+- Do not add companies that aren't in the evidence
+- Use professional but punchy language — this is a live sales intelligence report, not an academic paper
+- Return ONLY the markdown report. No preamble, no sign-off."""
 
     try:
         resp = await client.post(
@@ -1695,28 +1749,31 @@ INSTRUCTIONS:
             headers={
                 "x-api-key": ANTHROPIC_API_KEY,
                 "anthropic-version": "2023-06-01",
-                "content-type": "application/json"
+                "content-type": "application/json",
             },
             json={
-                "model": "claude-3-haiku-20240307",
-                "max_tokens": 1000,
-                "system": "You are a professional intelligence researcher reporting on public market signals.",
-                "messages": [{"role": "user", "content": prompt}]
+                "model": "claude-3-5-sonnet-20241022",
+                "max_tokens": 4000,
+                "system": (
+                    "You are an elite B2B GTM intelligence analyst. "
+                    "Write structured markdown reports with Signal Type and Outreach Angle for every named entry. "
+                    "Be specific: name the person, the tool, the dollar amount, the date. "
+                    "Never write vague summaries. Every sentence must be actionable."
+                ),
+                "messages": [{"role": "user", "content": prompt}],
             },
-            timeout=60,
+            timeout=90,
         )
         resp.raise_for_status()
-        data = resp.json()
+        data   = resp.json()
         answer = data.get("content", [{}])[0].get("text", "Error synthesizing answer.")
-        
-        usage = data.get("usage", {})
-        in_tokens = usage.get("input_tokens", 0)
-        out_tokens = usage.get("output_tokens", 0)
-        cost = (in_tokens / 1_000_000) * COST_SONNET_IN_PER_1M + (out_tokens / 1_000_000) * COST_SONNET_OUT_PER_1M
+        usage  = data.get("usage", {})
+        cost   = (usage.get("input_tokens", 0) / 1_000_000) * COST_SONNET_IN_PER_1M \
+               + (usage.get("output_tokens", 0) / 1_000_000) * COST_SONNET_OUT_PER_1M
         return answer, cost
     except httpx.HTTPStatusError as e:
         print(f"Synthesis HTTP failed: {e.response.text}")
-        return f"API Error: {e.response.status_code} - {e.response.text}", 0.0
+        return f"API Error: {e.response.status_code} — {e.response.text}", 0.0
     except Exception as e:
         print(f"Synthesis failed: {e}")
         return f"An error occurred while synthesizing: {str(e)}", 0.0
@@ -2424,10 +2481,12 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
 
         # ── Phase 5: Synthesize answer ──
         yield sse("phase", {"phase": "synthesis", "status": "running",
-                             "msg": "Synthesizing final answer with Claude Sonnet…"})
-        answer, synthesis_cost = await synthesize_answer(client, question, evidence_by_company)
+                             "msg": "Synthesizing tiered intelligence report with Claude Sonnet 3.5…"})
+        answer, synthesis_cost = await synthesize_answer(
+            client, question, evidence_by_company, revops_context=revops_context
+        )
         llm_cost += synthesis_cost
-        yield sse("phase", {"phase": "synthesis", "status": "done", "msg": f"Answer ready (Synthesis Cost: ${synthesis_cost:.4f})"})
+        yield sse("phase", {"phase": "synthesis", "status": "done", "msg": f"Intelligence report ready (${synthesis_cost:.4f})"})
 
         # ── Final result ──
         elapsed = round(time.time() - t0, 1)
