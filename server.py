@@ -578,7 +578,13 @@ async def search_parallel_ai(
         print(f"PAI agentic search error: {e}")
         return []
 
-# ── Step 2b: Exa Search (deep-lite model) ────────────────────────────────────
+# ── Step 2b: Exa Search (deep-reasoning model) ───────────────────────────────
+# Domains excluded globally — no signal value, just noise
+_EXA_EXCLUDE_DOMAINS = [
+    "youtube.com", "instagram.com", "facebook.com", "tiktok.com",
+    "twitter.com", "x.com", "pinterest.com", "reddit.com",
+]
+
 async def search_exa(
     client: httpx.AsyncClient,
     queries: list[str],
@@ -586,16 +592,20 @@ async def search_exa(
     requested_count: int = 0,
 ) -> list[dict]:
     """
-    Run all queries in parallel via Exa deep-lite model with date filtering.
+    Run all queries in parallel via Exa deep-reasoning model with date filtering.
 
-    deep-lite uses Exa's deep learning retrieval model for higher quality results.
-    Highlights use maxCharacters (not numSentences) — returns richer text per URL.
+    deep-reasoning uses Exa's highest-quality retrieval model — slower but
+    significantly more precise than deep-lite or auto/neural.
+    Highlights use maxCharacters:1000 — tight, high-signal excerpts.
+    endPublishedDate is always set to today to bound the window cleanly.
 
     For large requested_count (> 100): Exa caps at 100 per call, so we run
-    ceil(requested_count / 100) batches across queries, then deduplicate.
+    ceil(requested_count / 100) extra sweeps across the top 3 queries.
     """
     EXA_MAX_PER_CALL = 100
-    start_date = (datetime.date.today() - datetime.timedelta(days=max_days)).isoformat()
+    today      = datetime.date.today()
+    start_date = (today - datetime.timedelta(days=max_days)).isoformat()
+    end_date   = today.isoformat()
 
     # How many results to request per API call
     if requested_count > EXA_MAX_PER_CALL:
@@ -603,19 +613,21 @@ async def search_exa(
     elif requested_count > 0:
         num_results = max(requested_count, 40)
     else:
-        num_results = 40  # default
+        num_results = 100  # deep-reasoning: always ask for 100, quality filters trim later
 
     async def _one(q: str) -> list[dict]:
         try:
             payload: dict = {
                 "query":              q,
-                "type":               "deep-lite",
+                "type":               "deep-reasoning",
                 "numResults":         num_results,
                 "startPublishedDate": start_date + "T00:00:00.000Z",
+                "endPublishedDate":   end_date   + "T23:59:59.999Z",
+                "excludeDomains":     _EXA_EXCLUDE_DOMAINS,
                 "outputSchema":       {"type": "text"},
                 "contents": {
                     "highlights": {
-                        "maxCharacters": 4000,
+                        "maxCharacters": 1000,
                     }
                 },
             }
@@ -623,7 +635,7 @@ async def search_exa(
                 EXA_URL,
                 headers={"x-api-key": EXA_API_KEY, "Content-Type": "application/json"},
                 json=payload,
-                timeout=30,
+                timeout=60,   # deep-reasoning is slower — allow more time
             )
             resp.raise_for_status()
             out = []
@@ -647,17 +659,17 @@ async def search_exa(
                     "_highlights":        highlights,
                 })
             return out
-        except Exception:
+        except Exception as e:
+            print(f"Exa deep-reasoning error for query '{q[:60]}': {e}")
             return []
 
-    # Build task list — all queries run in parallel
+    # All queries run in parallel
     tasks = [_one(q) for q in queries]
 
-    # For large counts (> 100): we need more query batches to surface enough unique results.
-    # Take the top 3 sharpest queries and run them again as extra sweep batches.
+    # For large counts (> 100): extra sweeps across top 3 sharpest queries
     if requested_count > EXA_MAX_PER_CALL:
         extra_batches = math.ceil(requested_count / EXA_MAX_PER_CALL) - 1
-        for _ in range(min(extra_batches, 2)):   # max 3 total sweeps (300 results)
+        for _ in range(min(extra_batches, 2)):   # max 3 total sweeps → up to 300
             tasks.extend([_one(q) for q in queries[:3]])
 
     batches = await asyncio.gather(*tasks)
@@ -1060,11 +1072,76 @@ def sanity_check_evidence(records: list[dict], max_days: int = 180) -> tuple[lis
 
     return passed, rejected
 
+# ── Person / role signal extractor ───────────────────────────────────────────
+# Matches titles like "VP of Engineering", "Head of Sales", "Senior Director"
+_PERSON_TITLE_RE = re.compile(
+    r'(?:(?:Senior|Sr\.?|Junior|Jr\.?|Principal|Staff|Lead|Chief|Global|'
+    r'Regional|Associate|Founding|Co-)\s+)?'
+    r'(?:VP|Vice President|President|CEO|CTO|CPO|CMO|CFO|COO|CISO|CRO|'
+    r'Director|Head|Manager|Engineer|Architect|Scientist|Analyst|'
+    r'Founder|Partner|Fellow|Advisor)\s+(?:of\s+|at\s+)?[\w\s&,]{2,40}',
+    re.IGNORECASE,
+)
+# Matches action verbs that indicate who did what
+_ACTION_VERB_RE = re.compile(
+    r'\b(published|posted|wrote|authored|shared|announced|presented|'
+    r'released|launched|introduced|revealed|detailed|explained|described)\b',
+    re.IGNORECASE,
+)
+
+def _extract_precise_signal(url: str, content: str, company_name: str, best_para: str) -> str:
+    """
+    Build a precise, human-readable signal string from scraped content.
+
+    Priority order:
+    1. Person title + action + subject  ("VP of Eng at Acme published a deep-dive on…")
+    2. Company + action + subject       ("Acme launched their new agentic pipeline…")
+    3. Verbatim excerpt from best paragraph (fallback)
+
+    Always ends with the proof URL so the reader can click straight through.
+    """
+    search_text = content[:3000]
+
+    # Try to find a person title near an action verb
+    person_match = _PERSON_TITLE_RE.search(search_text)
+    action_match = _ACTION_VERB_RE.search(search_text)
+
+    if person_match and action_match:
+        person = person_match.group(0).strip()
+        action = action_match.group(1).lower()
+        # Grab up to 120 chars after the action verb as the subject
+        action_pos  = action_match.end()
+        subject_raw = search_text[action_pos:action_pos + 150].strip()
+        subject     = re.sub(r'\s+', ' ', subject_raw.split('\n')[0])[:120]
+        return (
+            f"{person} at {company_name} {action}: \"{subject}\" — "
+            f"Source: {url}"
+        )
+
+    # No person found — use company + action
+    if action_match:
+        action    = action_match.group(1).lower()
+        action_pos = action_match.end()
+        subject_raw = search_text[action_pos:action_pos + 150].strip()
+        subject     = re.sub(r'\s+', ' ', subject_raw.split('\n')[0])[:120]
+        return (
+            f"{company_name} {action}: \"{subject}\" — "
+            f"Source: {url}"
+        )
+
+    # Fallback: verbatim best paragraph excerpt
+    excerpt = best_para[:200].strip() if best_para else ""
+    if excerpt:
+        return f"{company_name}: \"{excerpt}\" — Source: {url}"
+
+    return f"Content from {company_name} — Source: {url}"
+
+
 def extract_evidence(url: str, content: str, question: str, hint_date: str = "") -> dict:
     """
     Text-based evidence extraction — no external API.
     Scores paragraphs by keyword overlap with the question,
-    returns the most relevant verbatim excerpt.
+    returns the most relevant verbatim excerpt + a precise signal string.
     """
     if not content.strip():
         return {"url": url, "relevant": False}
@@ -1074,8 +1151,6 @@ def extract_evidence(url: str, content: str, question: str, hint_date: str = "")
         return {"url": url, "relevant": False}
 
     # Use TOPIC keywords for scoring (not full question keywords).
-    # This prevents long "find companies that published blogs about X" questions
-    # from inflating the denominator and killing all confidence scores.
     question_kws = set(_extract_keywords(question))
     topic_kws    = set(_extract_topic_keywords(question))
     score_kws    = topic_kws if len(topic_kws) >= 2 else question_kws
@@ -1085,11 +1160,10 @@ def extract_evidence(url: str, content: str, question: str, hint_date: str = "")
     # Split into paragraphs (prefer natural paragraph breaks)
     paragraphs = [p.strip() for p in re.split(r'\n{2,}|\. {2,}', content) if len(p.strip()) > 50]
     if not paragraphs:
-        # Fall back to fixed-size chunks
         paragraphs = [content[i:i+400] for i in range(0, min(len(content), 4000), 300)]
 
-    best_para   = ""
-    best_score  = 0
+    best_para  = ""
+    best_score = 0
     for para in paragraphs[:80]:
         para_words = set(_extract_keywords(para))
         overlap = len(score_kws & para_words)
@@ -1097,57 +1171,81 @@ def extract_evidence(url: str, content: str, question: str, hint_date: str = "")
             best_score = overlap
             best_para  = para[:500]
 
-    # We trust Exa's neural search for base semantic relevance (0.65).
-    # We add up to 0.30 purely as a bonus if exact lexical matches occur.
     effective_denom = min(len(score_kws), 5)
-    confidence = round(min(0.95, 0.65 + (best_score / max(effective_denom, 1) * 0.3)), 2)
+    confidence   = round(min(0.95, 0.65 + (best_score / max(effective_denom, 1) * 0.3)), 2)
     company_name = domain.split('.')[0].replace('-', ' ').title()
-    summary      = f"This page from {company_name} contains content related to: {', '.join(list(question_kws)[:5])}"
+
+    # Build the precise signal — replaces the old generic summary
+    signal = _extract_precise_signal(url, content, company_name, best_para)
 
     # Best date: content-extracted first, search API hint as fallback
     content_date = _extract_date_from_content(content)
     best_date    = content_date or hint_date
 
     return {
-        "url":          url,
-        "relevant":     True,
-        "company_name": company_name,
+        "url":            url,
+        "relevant":       True,
+        "company_name":   company_name,
         "company_domain": domain,
-        "content_type": _detect_content_type(url, content),
+        "content_type":   _detect_content_type(url, content),
         "published_date": best_date,
-        "key_excerpt":  best_para,
-        "summary":      summary,
-        "confidence":   confidence,
+        "key_excerpt":    best_para,
+        "signal":         signal,          # ← precise, proof-linked signal
+        "proof_url":      url,             # ← always present, always clickable
+        "confidence":     confidence,
     }
 
 # ── Step 4b: Extract True Subject Entities (Phase 4 AI Extractor) ─────────
-async def _extract_subjects_batch(client: httpx.AsyncClient, batch: list[dict], question: str) -> tuple[dict[str, dict], float]:
-    """Process a single batch of up to 15 snippets through Claude."""
-    prompt = f"""You are an elite RevOps Data Analyst.
-The user specifically asked for: "{question}"
+async def _extract_subjects_batch(
+    client: httpx.AsyncClient,
+    batch: list[dict],
+    question: str,
+    revops_context: dict | None = None,
+) -> tuple[dict[str, dict], float]:
+    """
+    Process a single batch of up to 15 snippets through Claude.
+    revops_context (optional) carries the buyer persona + signal_focus from
+    analyze_revops_intent() so the signal is shaped for the right audience.
+    """
+    persona      = (revops_context or {}).get("buyer_persona", "RevOps professional")
+    signal_focus = (revops_context or {}).get("signal_focus", "the specific action taken and by whom")
 
-I will provide an array of web snippets. Each snippet has an "id". Your job is twofold:
-1. Extract the ACTUAL subject company performing the core action (e.g., the company building AI, the company firing people, etc.), NOT the news outlet, press wire, or directory listing it.
-2. Write a highly precise, well-crafted 1-2 sentence `aligned_signal` that DIRECTLY answers the user's query based on the snippet. 
-   - NEVER use filler like "This article discusses..." or "Section Title: ...". 
-   - DO extract the names of executives, specific tools, or critical strategies mentioned.
-   - Example 1: "Jane Doe, VP of Engineering at Acme Corp, published a technical deep-dive on replacing their legacy CRM with a custom agentic orchestration layer."
-   - Example 2: "TinyFish emerged from stealth with a $15M seed round to build autonomous database agents."
+    prompt = f"""You are an elite GTM intelligence analyst writing for a {persona}.
+The user asked: "{question}"
+Signal focus: {signal_focus}
+
+I will provide an array of web snippets. Each snippet has an "id" and a "url". Your job:
+1. Identify the ACTUAL subject company performing the core action — NOT the news outlet or aggregator.
+2. Write a highly precise `aligned_signal` (1-2 sentences) that directly answers the user's query.
+   - ALWAYS name the specific person and their title/role if mentioned (e.g. "Jane Smith, VP of Sales at Acme").
+   - ALWAYS state the specific action (published, announced, launched, hired, raised, etc.).
+   - Include concrete details: dollar amounts, tool names, team sizes, dates — whatever is present.
+   - End with: "Proof: [url]" so the reader can verify immediately.
+   - BAD: "This article discusses agentic systems."
+   - GOOD: "Marcus Lee, Head of Platform Engineering at Acme Corp, published a post detailing how they replaced LangChain with a custom multi-agent orchestration layer — Proof: https://acme.com/blog/agents"
+3. Extract `person_name` and `person_title` if any individual is named as the actor (else empty string).
 
 Rules:
-1. If prnewswire.com or stocktitan.net publishes "Acme Corp Raises $10M Series A", the subject is "Acme Corp", domain "acme.com".
-2. If it is a generic "How-to" guide published by a company, the subject is the publisher.
-3. If a company name is not obvious or it is purely a generic news roundup of many companies, explicitly output "unknown" for both company and domain. DO NOT guess the news outlet.
-4. NEVER use a news site, press wire, or aggregator as the subject_company.
+- If prnewswire/businesswire publishes "Acme Raises $10M", subject = "Acme", domain = "acme.com"
+- If it's a company's own blog/post, subject = that company
+- If it's a generic roundup with no single acting company, output "unknown" for company/domain
+- NEVER use a news wire or aggregator as subject_company
 
-Return ONLY a JSON object:
+Return ONLY valid JSON:
 {{
   "extractions": [
-    {{"id": "0", "subject_company": "Acme Corp", "subject_domain": "acme.com", "aligned_signal": "Acme Corp's CTO published a detailed architecture guide on their transition to AI agents."}}
+    {{
+      "id": "0",
+      "subject_company": "Acme Corp",
+      "subject_domain": "acme.com",
+      "person_name": "Marcus Lee",
+      "person_title": "Head of Platform Engineering",
+      "aligned_signal": "Marcus Lee, Head of Platform Engineering at Acme Corp, published a post on replacing LangChain with a custom multi-agent layer — Proof: https://acme.com/blog/agents"
+    }}
   ]
 }}
 
-Snippets to analyze:
+Snippets:
 {json.dumps(batch)}"""
 
     try:
@@ -1156,8 +1254,13 @@ Snippets to analyze:
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
             json={
                 "model": "claude-3-haiku-20240307",
-                "max_tokens": 2000,
-                "system": "Output only valid JSON. Never use news sites as subject_company. Focus on who is acting and what they are doing.",
+                "max_tokens": 2500,
+                "system": (
+                    "Output only valid JSON. "
+                    "Never use news wires or aggregators as subject_company. "
+                    "Always name the specific person and title if present. "
+                    "aligned_signal must end with 'Proof: [url]'."
+                ),
                 "messages": [{"role": "user", "content": prompt}]
             },
             timeout=30,
@@ -1177,45 +1280,60 @@ Snippets to analyze:
         print("Subject Entity Extraction failed via AI:", e)
         return {}, 0.0
 
-async def extract_subjects_with_ai(client: httpx.AsyncClient, evidence_list: list[dict], question: str) -> tuple[dict[str, dict], float]:
+async def extract_subjects_with_ai(
+    client: httpx.AsyncClient,
+    evidence_list: list[dict],
+    question: str,
+    revops_context: dict | None = None,
+) -> tuple[dict[str, dict], float]:
     """
-    Uses Claude to isolate the ACTUAL company acting in the snippet.
+    Uses Claude to isolate the ACTUAL company + person acting in the snippet.
     Processes in batches of 15 to avoid output truncation.
-    Returns (extractions_dict, llm_cost).
+    Returns (extractions_dict keyed by URL, llm_cost).
+
+    Each value in the dict contains:
+      subject_company, subject_domain, person_name, person_title, aligned_signal
     """
     if not evidence_list:
         return {}, 0.0
-    
-    # Assign temp IDs for flawless mapping (Claude often mutates raw URLs)
+
+    # Assign temp IDs — Claude sometimes mutates raw URLs, IDs are stable
     for i, e in enumerate(evidence_list[:60]):
         e["_temp_id"] = str(i)
-        
-    all_payloads = [{"id": e["_temp_id"], "snippet": e.get("key_excerpt") or e.get("snippet") or ""} for e in evidence_list[:60]]
-    
-    # Process in chunks of 15 to prevent output token truncation
+
+    all_payloads = [
+        {
+            "id":      e["_temp_id"],
+            "url":     e.get("url", ""),
+            "snippet": e.get("key_excerpt") or e.get("snippet") or "",
+        }
+        for e in evidence_list[:60]
+    ]
+
     BATCH_SIZE = 15
     batches = [all_payloads[i:i+BATCH_SIZE] for i in range(0, len(all_payloads), BATCH_SIZE)]
-    
+
     results = await asyncio.gather(*[
-        _extract_subjects_batch(client, batch, question) for batch in batches
+        _extract_subjects_batch(client, batch, question, revops_context=revops_context)
+        for batch in batches
     ])
-    
+
     merged_by_id: dict[str, dict] = {}
     total_cost = 0.0
     for batch_result, batch_cost in results:
         merged_by_id.update(batch_result)
         total_cost += batch_cost
-        
-    # Remap back to URL correctly and apply negative filtering
+
+    # Remap by URL + apply negative filtering (drop news wires as subjects)
     cleaned: dict[str, dict] = {}
     for e in evidence_list[:60]:
         _id = e["_temp_id"]
         if _id in merged_by_id:
-            data = merged_by_id[_id]
+            data        = merged_by_id[_id]
             subj_domain = (data.get("subject_domain") or "").lower().strip()
             if subj_domain and subj_domain not in _NEWS_WIRE_DOMAINS and subj_domain not in _MEDIA_DOMAINS:
                 cleaned[e["url"]] = data
-            
+
     return cleaned, total_cost
 
 # ── Step 5: Synthesize final answer (template-based) ─────────────────────────
@@ -1364,6 +1482,88 @@ def _infer_max_days(question: str) -> int:
         return 180
     return 90   # default: 3 months
 
+async def analyze_revops_intent(client: httpx.AsyncClient, question: str) -> tuple[dict, float]:
+    """
+    Phase -1: Understand WHY the user is asking this question before doing anything else.
+
+    A RevOps person asking "VPs who posted about AI agents" wants a prospect list.
+    A founder asking the same wants competitive intelligence.
+    The output columns, signal focus, and extraction strategy all change accordingly.
+
+    Always-present columns: company_name, company_domain.
+    All other columns are dynamic based on the use case.
+
+    Returns (context_dict, llm_cost) where context_dict contains:
+      - buyer_persona   : who is asking (SDR, AE, RevOps, Founder, Analyst…)
+      - use_case        : what they will DO with the answer (prospect, track, hire…)
+      - signal_focus    : what to look for in scraped content
+      - output_columns  : ordered list of columns for the response table
+      - search_modifier : extra keywords to inject into queries
+    """
+    prompt = f"""You are a senior RevOps strategist. A user has asked the following question to a B2B intelligence tool:
+
+"{question}"
+
+Your job is to understand the underlying business rationale — WHY would someone ask this — and define the ideal output structure.
+
+Think step by step:
+1. Who is the most likely persona asking this? (SDR, AE, RevOps, Marketing, Founder, Analyst, Recruiter…)
+2. What is their use case? (finding prospects, tracking competitors, identifying buying signals, sourcing candidates, market research…)
+3. What specific signal in the content would actually be valuable to them?
+4. What output columns would make this immediately actionable? (company_name and company_domain are ALWAYS included)
+5. What extra search modifier words would improve result quality for this persona?
+
+Return ONLY valid JSON:
+{{
+  "buyer_persona": "SDR at a B2B SaaS company",
+  "use_case": "Identifying warm prospects who are actively thinking about AI agent infrastructure",
+  "signal_focus": "The specific person who published the post, their title, what they said about the technology, and whether their company is likely a buyer",
+  "output_columns": ["company_name", "company_domain", "person_name", "person_title", "signal", "proof_url", "published_date"],
+  "search_modifier": "engineering blog post published written"
+}}"""
+
+    try:
+        resp = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={
+                "model":      "claude-3-haiku-20240307",
+                "max_tokens": 600,
+                "system":     "You are a JSON-only RevOps strategist. Output nothing but valid JSON.",
+                "messages":   [{"role": "user", "content": prompt}],
+            },
+            timeout=20,
+        )
+        resp.raise_for_status()
+        data     = resp.json()
+        usage    = data.get("usage", {})
+        llm_cost = (usage.get("input_tokens", 0) / 1_000_000) * COST_HAIKU_IN_PER_1M \
+                 + (usage.get("output_tokens", 0) / 1_000_000) * COST_HAIKU_OUT_PER_1M
+        raw_text = data.get("content", [{}])[0].get("text", "{}")
+        match    = re.search(r'\{.*\}', raw_text.replace('\n', ''), re.DOTALL)
+        ctx      = json.loads(match.group(0)) if match else json.loads(raw_text)
+
+        # Guarantee company_name + company_domain are always first two columns
+        cols = ctx.get("output_columns", [])
+        for must_have in ["company_domain", "company_name"]:
+            if must_have not in cols:
+                cols.insert(0, must_have)
+        ctx["output_columns"] = cols
+
+        return ctx, llm_cost
+
+    except Exception as e:
+        print(f"RevOps intent analysis failed: {e}")
+        # Safe defaults — always works even if Claude is down
+        return {
+            "buyer_persona":   "RevOps professional",
+            "use_case":        "general intelligence gathering",
+            "signal_focus":    "the specific action taken and by whom",
+            "output_columns":  ["company_name", "company_domain", "signal", "proof_url", "published_date"],
+            "search_modifier": "",
+        }, 0.0
+
+
 async def analyze_intent_and_routing(client: httpx.AsyncClient, question: str) -> tuple[dict, str, list[str], float]:
     """Uses Claude to clean typos, generate search queries, and route to tools."""
     prompt = f"""You are the intelligence routing brain for a public data AI agent.
@@ -1461,9 +1661,28 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
     limits = httpx.Limits(max_connections=12, max_keepalive_connections=6)
     async with httpx.AsyncClient(verify=False, limits=limits, headers={"Connection": "close"}) as client:
 
+        # ── Phase -1: RevOps Intent Analysis ─────────────────────────────────
+        yield sse("phase", {"phase": "revops_intent", "status": "running",
+                             "msg": "Understanding the business rationale behind your query…"})
+        revops_context, revops_cost = await analyze_revops_intent(client, question)
+        llm_cost = revops_cost
+        yield sse("phase", {
+            "phase":          "revops_intent",
+            "status":         "done",
+            "buyer_persona":  revops_context.get("buyer_persona"),
+            "use_case":       revops_context.get("use_case"),
+            "signal_focus":   revops_context.get("signal_focus"),
+            "output_columns": revops_context.get("output_columns"),
+            "msg": (
+                f"Persona: {revops_context.get('buyer_persona')} · "
+                f"Use case: {revops_context.get('use_case')}"
+            ),
+        })
+
         # ── Phase 0: Intent & Routing via Claude ──
         yield sse("phase", {"phase": "routing", "status": "running", "msg": "Analyzing intent with Claude..."})
-        routing_decisions, raw_clean_question, ai_queries, llm_cost = await analyze_intent_and_routing(client, question)
+        routing_decisions, raw_clean_question, ai_queries, routing_cost = await analyze_intent_and_routing(client, question)
+        llm_cost += routing_cost
         
         # Globally update the question variable to the typo-free version so downstream string-matching tools don't fail!
         question = raw_clean_question if isinstance(raw_clean_question, str) else question
@@ -1472,7 +1691,7 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
         use_pai = routing_decisions.get("parallel_ai", True)
         use_sec = routing_decisions.get("sec_api", True)
         
-        route_msg = f"Routing decision via Claude (Cost: ${llm_cost:.4f}): Exa={use_exa}, ParallelAI={use_pai}, SEC={use_sec}"
+        route_msg = f"Routing: Exa={use_exa}, ParallelAI={use_pai}, SEC={use_sec} (LLM so far: ${llm_cost:.4f})"
         yield sse("phase", {"phase": "routing", "status": "done", "msg": route_msg})
 
         # ── Phase 1: Derive queries ──
@@ -1690,9 +1909,11 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
         date_unverified    = [r for r in relevant if r.get("date_unverified")]
 
         # ── Intelligence Layer: Subject Entity Extraction ──
-        yield sse("phase", {"phase": "extraction", "status": "running", "msg": "Using AI to extract the true subject companies…"})
-        ai_entities, entity_extraction_cost = await extract_subjects_with_ai(client, relevant, question)
-        llm_cost += entity_extraction_cost  # ← was missing before — now properly tracked
+        yield sse("phase", {"phase": "extraction", "status": "running", "msg": "Using AI to extract the true subject companies, persons, and precise signals…"})
+        ai_entities, entity_extraction_cost = await extract_subjects_with_ai(
+            client, relevant, question, revops_context=revops_context
+        )
+        llm_cost += entity_extraction_cost
 
         # Group by canonical company domain
         evidence_by_company: dict[str, list[dict]] = {}
@@ -1728,15 +1949,24 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
             if co_name:
                 entity_resolver.learn(canonical, co_name)
 
-            aligned_signal = ai_data.get("aligned_signal")
-            
+            aligned_signal = ai_data.get("aligned_signal") or ev.get("signal", "")
+            person_name    = ai_data.get("person_name", "")
+            person_title   = ai_data.get("person_title", "")
+
+            # signal = AI-crafted precise statement (with proof URL baked in)
+            # proof_url = always the raw URL for direct click-through
             record = {
                 "url":                ev["url"],
+                "proof_url":          ev["url"],
                 "title":              meta.get("title", ev.get("url", "")),
                 "date":               ev.get("published_date") or meta.get("date", ""),
+                "published_date":     ev.get("published_date") or meta.get("date", ""),
                 "content_type":       ev.get("content_type", ""),
-                "key_excerpt":        aligned_signal if aligned_signal else ev.get("key_excerpt", ""),
-                "summary":            aligned_signal if aligned_signal else ev.get("summary", ""),
+                "key_excerpt":        ev.get("key_excerpt", ""),
+                # signal = the precise, human-readable statement (AI > regex fallback)
+                "signal":             aligned_signal if aligned_signal else ev.get("signal", ev.get("key_excerpt", "")[:200]),
+                "person_name":        person_name,
+                "person_title":       person_title,
                 "confidence":         float(ev.get("confidence", 0.5)),
                 "discovered_via":     meta.get("source", "unknown"),
                 "snippet":            meta.get("snippet", ""),
@@ -1782,10 +2012,16 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
             reverse=True,
         ):
             companies_list.append({
-                "company_domain": domain,
                 "company_name":   items[0].get("company_name") or domain,
+                "company_domain": domain,
                 "evidence_count": len(items),
                 "evidence":       items,
+                # Bubble up the best signal + person for the top-level row
+                "signal":         items[0].get("signal", ""),
+                "proof_url":      items[0].get("proof_url", items[0].get("url", "")),
+                "person_name":    items[0].get("person_name", ""),
+                "person_title":   items[0].get("person_title", ""),
+                "published_date": items[0].get("published_date", ""),
             })
 
         # Generate dynamic follow-ups in parallel (non-blocking — fire and await)
@@ -1800,6 +2036,13 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
             "total_articles":   sum(len(c["evidence"]) for c in companies_list),
             "elapsed":          elapsed,
             "follow_ups":       follow_ups,
+            # RevOps intent context — frontend uses output_columns to render the table
+            "revops_context": {
+                "buyer_persona":  revops_context.get("buyer_persona"),
+                "use_case":       revops_context.get("use_case"),
+                "signal_focus":   revops_context.get("signal_focus"),
+                "output_columns": revops_context.get("output_columns"),
+            },
             "pipeline_stats": {
                 "queries_generated":    len(queries),
                 "urls_discovered":      len(all_results),
