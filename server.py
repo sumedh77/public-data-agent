@@ -132,6 +132,16 @@ _NEWS_WIRE_DOMAINS = {
     "wired.com", "zdnet.com", "theverge.com",
     "forbes.com", "bloomberg.com", "reuters.com", "cnbc.com",
     "ft.com", "infocapital.com", "theregister.com",
+    # Additional news / media outlets
+    "thenextweb.com", "infoq.com", "devops.com", "sdtimes.com",
+    "helpnetsecurity.com", "darkreading.com", "securityweek.com",
+    "cio.com", "computerworld.com", "itpro.co.uk", "techtarget.com",
+    "informationweek.com", "networkworld.com", "eweek.com",
+    "readwrite.com", "siliconangle.com", "betakit.com",
+    "hbr.org", "mckinsey.com", "gartner.com",
+    "morningstar.com", "barrons.com", "wsj.com", "nytimes.com",
+    "washingtonpost.com", "theguardian.com", "bbc.co.uk", "bbc.com",
+    "news.google.com", "msn.com", "yahoo.com",
 }
 
 # ── Entity resolution ─────────────────────────────────────────────────────────
@@ -1711,29 +1721,75 @@ INSTRUCTIONS:
         print(f"Synthesis failed: {e}")
         return f"An error occurred while synthesizing: {str(e)}", 0.0
 
+# ── Claude-only direct knowledge answer ──────────────────────────────────────
+async def answer_from_claude_knowledge(client: httpx.AsyncClient, question: str) -> tuple[str, float]:
+    """
+    For factual / well-known entity questions Claude can answer without web search.
+    Returns (answer_text, llm_cost).
+    """
+    if not ANTHROPIC_API_KEY:
+        return "Claude API key not configured.", 0.0
+    try:
+        resp = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={
+                "model": "claude-3-haiku-20240307",
+                "max_tokens": 1024,
+                "system": (
+                    "You are a knowledgeable B2B technology research assistant. "
+                    "Answer the user's question concisely and accurately from your training knowledge. "
+                    "Format your answer in clean markdown. Be specific and helpful."
+                ),
+                "messages": [{"role": "user", "content": question}],
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        usage = data.get("usage", {})
+        cost = (usage.get("input_tokens", 0) / 1_000_000) * COST_HAIKU_IN_PER_1M \
+             + (usage.get("output_tokens", 0) / 1_000_000) * COST_HAIKU_OUT_PER_1M
+        answer = data.get("content", [{}])[0].get("text", "")
+        return answer, cost
+    except Exception as e:
+        print(f"Claude knowledge answer failed: {e}")
+        return f"Unable to answer: {e}", 0.0
+
+
 # ── Step 5b: Generate contextual follow-up suggestions ───────────────────────
-async def generate_follow_ups(client: httpx.AsyncClient, question: str, top_companies: list[str]) -> list[dict]:
-    """Uses Claude Haiku to generate 3 highly contextual follow-up questions."""
+async def generate_follow_ups(
+    client: httpx.AsyncClient,
+    question: str,
+    top_companies: list[str],
+    top_signals: list[str] | None = None,
+) -> list[dict]:
+    """Uses Claude Haiku to generate 3 highly contextual follow-up questions grounded in actual results."""
     if not ANTHROPIC_API_KEY:
         return []
     companies_str = ", ".join(top_companies[:6]) if top_companies else "the discovered companies"
-    prompt = f"""You are a RevOps intelligence analyst assistant. A user just ran this research query:
+    signals_str   = "\n".join(f"- {s}" for s in (top_signals or [])[:5]) if top_signals else ""
 
-QUERY: "{question}"
+    prompt = f"""You are a senior RevOps intelligence analyst. A user just ran this B2B research query and received results.
+
+ORIGINAL QUERY: "{question}"
 
 TOP COMPANIES FOUND: {companies_str}
+{f"ACTUAL SIGNALS FOUND:{chr(10)}{signals_str}" if signals_str else ""}
 
-Generate exactly 3 short, highly specific follow-up research questions that would be the NATURAL NEXT STEP for a B2B salesperson or RevOps analyst after seeing these results. The follow-ups must:
-1. Be directly related to what the user just asked — not generic
-2. Reference the actual companies found OR the theme of the query
-3. Be actionable (e.g., check hiring, check funding, track displacement, monitor new signals)
-4. Each follow-up should have a short display label (under 55 chars) and an emoji
+Generate exactly 3 follow-up research questions that are the NATURAL NEXT STEP given these specific results.
+Rules:
+1. Each follow-up MUST be directly derived from the actual companies or signals found — NEVER generic
+2. Vary the angle: e.g. hiring intent → funding check → competitive displacement, or drill deeper into the same theme
+3. Each follow-up should reference at least 1-2 of the actual companies or a specific technology/signal found
+4. Keep the label under 55 chars and add a relevant emoji
+5. The "query" field should be the full question the user would actually type
 
-Return ONLY a JSON array:
+Return ONLY a JSON array of exactly 3 objects:
 [
-  {{"label": "📈 Check if top results are hiring for RevOps roles", "query": "Which of these companies are hiring RevOps or Sales roles: {companies_str}"}},
-  {{"label": "💰 Cross-reference with recent funding rounds", "query": "Which of these companies raised funding in the last 90 days: {companies_str}"}},
-  {{"label": "🎯 Check for Salesforce displacement signals", "query": "Are any of these companies showing CRM displacement signals: {companies_str}"}}
+  {{"label": "emoji Short label here", "query": "Full follow-up question referencing {companies_str.split(',')[0].strip() if companies_str != 'the discovered companies' else 'the companies'}..."}},
+  {{"label": "emoji Short label here", "query": "..."}},
+  {{"label": "emoji Short label here", "query": "..."}}
 ]"""
 
     try:
@@ -1742,8 +1798,8 @@ Return ONLY a JSON array:
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
             json={
                 "model": "claude-3-haiku-20240307",
-                "max_tokens": 500,
-                "system": "Output only valid JSON. No explanation.",
+                "max_tokens": 600,
+                "system": "Output only valid JSON array. No explanation. No markdown fences.",
                 "messages": [{"role": "user", "content": prompt}]
             },
             timeout=15,
@@ -1751,7 +1807,7 @@ Return ONLY a JSON array:
         resp.raise_for_status()
         data = resp.json()
         raw = data.get("content", [{}])[0].get("text", "[]")
-        match = re.search(r'\[.*\]', raw.replace('\n', ''), re.DOTALL)
+        match = re.search(r'\[.*\]', raw.replace('\n', ' '), re.DOTALL)
         return json.loads(match.group(0)) if match else []
     except Exception as e:
         print(f"Follow-up generation failed: {e}")
@@ -1872,20 +1928,21 @@ The user asked: "{question}"
 
 Instructions:
 1. "corrected_query": Fix ANY typos, spelling mistakes, and grammatical errors in the user's question, while preserving their exact intent.
-2. "search_queries": Generate an array of exactly 4 specialized search queries to find this data on Google/Exa. 
+2. "search_queries": Generate an array of exactly 4 specialized search queries to find this data on Google/Exa.
    - 1 should be a direct keyword search.
    - 2 should be semantic queries targeted at finding company signals (e.g. "companies that...").
    - 1 should be a first-person engineering/company blog query (e.g. "how we...").
 3. "routing": Decide which data tools are needed to answer this.
-   - "exa": Web search — use for general news, company blogs, product launches, tech content.
-   - "parallel_ai": Deep search — use for technical deep-dives, developer tooling, architecture.
-   - "sec_api": SEC EDGAR search — use ONLY for explicit SEC filings (10-K, 8-K), financial earnings, M&A, revenue.
+   - "claude_only": Set to TRUE if the question is a FACTUAL KNOWLEDGE question that Claude can answer directly without web search (e.g. "What does Stripe do?", "Does GitHub have an API?", "What is gRPC?", "Who is the CEO of Salesforce?", "What is HubSpot's pricing?", "Explain what Snowflake does", or any general tech concept / well-known company fact). Set FALSE for any query asking to FIND, LIST, DISCOVER, or TRACK companies / signals / articles.
+   - "exa": Web search — use for general news, company blogs, product launches, tech content. Set false if claude_only is true.
+   - "parallel_ai": Deep search — use for technical deep-dives, developer tooling, architecture. Set false if claude_only is true.
+   - "sec_api": SEC EDGAR search — use ONLY for explicit SEC filings (10-K, 8-K), financial earnings, M&A, revenue. Set false if claude_only is true.
 
 Return ONLY a valid JSON object matching this exact structure:
 {{
   "corrected_query": "...",
   "search_queries": ["...", "...", "...", "..."],
-  "routing": {{"exa": true, "parallel_ai": true, "sec_api": false}}
+  "routing": {{"claude_only": false, "exa": true, "parallel_ai": true, "sec_api": false}}
 }}"""
     try:
         resp = await client.post(
@@ -1919,25 +1976,31 @@ Return ONLY a valid JSON object matching this exact structure:
             res = json.loads(raw_text)
             
         routing = res.get("routing", {})
-        r_dict = {"exa": routing.get("exa", True), "parallel_ai": routing.get("parallel_ai", True), "sec_api": routing.get("sec_api", True)}
-        
+        claude_only = routing.get("claude_only", False)
+        r_dict = {
+            "claude_only":  claude_only,
+            "exa":          False if claude_only else routing.get("exa", True),
+            "parallel_ai":  False if claude_only else routing.get("parallel_ai", True),
+            "sec_api":      False if claude_only else routing.get("sec_api", False),
+        }
+
         # Hardcode SEC routing if the prompt explicitly mentions SEC keywords
         q_lower = question.lower()
         if any(kw in q_lower for kw in ["sec", "10-k", "10-q", "8-k", "earnings", "s-1"]):
             r_dict["sec_api"] = True
+            r_dict["claude_only"] = False
 
         return r_dict, res.get("corrected_query", question), res.get("search_queries", []), cost
     except httpx.HTTPStatusError as e:
         print(f"LLM routing HTTP failed: {e.response.text}")
         q_lower = question.lower()
         use_sec_fallback = any(kw in q_lower for kw in ["sec", "10-k", "10-q", "8-k", "earnings", "s-1"])
-        return {"exa": True, "parallel_ai": True, "sec_api": use_sec_fallback}, question, [], 0.0
+        return {"claude_only": False, "exa": True, "parallel_ai": True, "sec_api": use_sec_fallback}, question, [], 0.0
     except Exception as e:
         print("LLM routing failed. Defaulting to regex queries.", e)
-        # Force SEC to true if keywords present even on fallback
         q_lower = question.lower()
         use_sec_fallback = any(kw in q_lower for kw in ["sec", "10-k", "10-q", "8-k", "earnings", "s-1"])
-        return {"exa": True, "parallel_ai": True, "sec_api": use_sec_fallback}, question, [], 0.0
+        return {"claude_only": False, "exa": True, "parallel_ai": True, "sec_api": use_sec_fallback}, question, [], 0.0
 
 async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
     """
@@ -1988,12 +2051,39 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
         # Globally update the question variable to the typo-free version so downstream string-matching tools don't fail!
         question = raw_clean_question if isinstance(raw_clean_question, str) else question
         
-        use_exa = routing_decisions.get("exa", True)
-        use_pai = routing_decisions.get("parallel_ai", True)
-        use_sec = routing_decisions.get("sec_api", True)
-        
-        route_msg = f"Routing: Exa={use_exa}, ParallelAI={use_pai}, SEC={use_sec} (LLM so far: ${llm_cost:.4f})"
+        use_claude_only = routing_decisions.get("claude_only", False)
+        use_exa = routing_decisions.get("exa", True) and not use_claude_only
+        use_pai = routing_decisions.get("parallel_ai", True) and not use_claude_only
+        use_sec = routing_decisions.get("sec_api", False) and not use_claude_only
+
+        route_mode = "Claude Knowledge (no web search)" if use_claude_only else f"Exa={use_exa}, PAI={use_pai}, SEC={use_sec}"
+        route_msg = f"Routing: {route_mode} (LLM so far: ${llm_cost:.4f})"
         yield sse("phase", {"phase": "routing", "status": "done", "msg": route_msg})
+
+        # ── Claude-Only Fast Path ─────────────────────────────────────────────
+        if use_claude_only:
+            yield sse("phase", {"phase": "synthesis", "status": "running",
+                                 "msg": "Answering from Claude's knowledge base (no web search needed)…"})
+            answer, answer_cost = await answer_from_claude_knowledge(client, question)
+            llm_cost += answer_cost
+            elapsed = round(time.time() - t0, 1)
+            yield sse("phase", {"phase": "synthesis", "status": "done",
+                                 "msg": f"Answer ready from Claude knowledge (${answer_cost:.4f})"})
+            yield sse("done", {
+                "question":         question,
+                "answer":           answer,
+                "companies":        [],
+                "total_companies":  0,
+                "total_articles":   0,
+                "elapsed":          elapsed,
+                "follow_ups":       [],
+                "revops_context":   revops_context,
+                "pipeline_stats":   {"claude_only": True},
+                "sanity_report":    {},
+                "search_queries_used": [],
+            })
+            log_query_metrics(question, routing_decisions, llm_cost, 0, 0, 0, 0, 0, 0)
+            return
 
         # ── Phase 1: Derive queries ──
         yield sse("phase", {"phase": "query_generation", "status": "running",
@@ -2271,7 +2361,16 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
 
             # Fall back: if co_name still empty, derive from resolved domain
             if not co_name or co_name == "unknown":
-                co_name = co_domain.split('.')[0].replace('-', ' ').title() if co_domain != "unknown" else "unknown"
+                co_name = co_domain.split('.')[0].replace('-', ' ').title() if co_domain and co_domain != "unknown" else "unknown"
+
+            # ── Fix 1: Skip entries where we still can't identify the company ──
+            # "unknown" company/domain means it's a generic roundup or news outlet
+            # with no identifiable subject — never show these as a company row.
+            if co_name == "unknown" or co_domain == "unknown" or not co_name:
+                continue
+            # Also skip if the subject domain is a news wire / aggregator
+            if url_domain in _NEWS_WIRE_DOMAINS and (not ai_data or not ai_data.get("subject_company")):
+                continue
 
             domain    = co_domain or url_domain
             canonical = entity_resolver.resolve(co_name, domain) or domain
@@ -2353,9 +2452,10 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
                 "published_date": items[0].get("published_date", ""),
             })
 
-        # Generate dynamic follow-ups in parallel (non-blocking — fire and await)
+        # Generate dynamic follow-ups grounded in actual results
         top_company_names = [c["company_name"] for c in companies_list[:6]]
-        follow_ups = await generate_follow_ups(client, question, top_company_names)
+        top_signals       = [c.get("signal", "")[:120] for c in companies_list[:5] if c.get("signal")]
+        follow_ups = await generate_follow_ups(client, question, top_company_names, top_signals=top_signals)
 
         yield sse("done", {
             "question":         question,

@@ -104,14 +104,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
 .fb{max-width:520px;border-radius:var(--rl);padding:12px 16px;font-size:13px;line-height:1.65}
 .fb-a{background:var(--bg);border-radius:4px 14px 14px 14px}.fb-u{background:var(--pri);border-radius:14px 4px 14px 14px;color:#fff;max-width:400px}
 .fan{font-family:var(--mono);font-size:9px;color:var(--pri);letter-spacing:.04em;margin-bottom:5px;text-transform:uppercase;font-weight:500}
-.fsg{padding-left:40px;max-width:540px;margin-top:6px}
-.fsg-l{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--tm);margin-bottom:8px;font-weight:500}
-.fsg-ls{display:flex;flex-direction:column;gap:5px}
-.fsg-i{border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;cursor:pointer;background:var(--white);transition:all .15s;display:flex;gap:8px}
-.fsg-i:hover{border-color:var(--prb);background:var(--prl)}.fsg-i.used{opacity:.35;pointer-events:none}
-.fsg-arr{font-size:10px;color:var(--pri);flex-shrink:0;margin-top:2px}
-.fsg-txt{font-size:11.5px;color:var(--text);line-height:1.35;font-weight:500}
-.fsg-tag{font-family:var(--mono);font-size:9px;color:var(--tm);margin-top:3px}
+.fsg{padding-left:40px;max-width:580px;margin-top:8px}
+.fsg-l{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--tm);margin-bottom:10px;font-weight:600}
+.fsg-ls{display:flex;flex-direction:column;gap:7px}
+.fsg-i{border:1.5px solid var(--border);border-left:3px solid var(--pri);border-radius:var(--r);padding:11px 14px;cursor:pointer;background:var(--white);transition:all .15s;display:flex;gap:10px;align-items:flex-start}
+.fsg-i:hover{border-color:var(--prb);border-left-color:var(--prd);background:var(--prl);box-shadow:0 2px 8px rgba(99,102,241,.12);transform:translateX(2px)}.fsg-i.used{opacity:.35;pointer-events:none}
+.fsg-arr{font-size:12px;color:var(--pri);flex-shrink:0;margin-top:1px;font-weight:700}
+.fsg-txt{font-size:12px;color:var(--text);line-height:1.45;font-weight:500}
+.fsg-tag{font-family:var(--mono);font-size:9.5px;color:var(--pri);background:var(--prl);border:1px solid var(--prb);border-radius:4px;padding:1px 6px;margin-top:5px;display:inline-block;font-weight:600}
 .fth{display:flex;align-items:center;gap:8px;padding-left:40px}
 .fth-d{display:flex;gap:4px}
 .fth-d span{width:6px;height:6px;border-radius:50%;background:#818cf8;animation:tdp 1.4s ease-in-out infinite}
@@ -379,7 +379,7 @@ function openAgent(){resetA();document.getElementById('afs').classList.add('open
 function closeAgent(){document.getElementById('afs').classList.remove('open')}
 function sps(n,b){ps=n;document.querySelectorAll('.pg-p').forEach(x=>x.classList.toggle('active',x===b));renT(aR)}
 function resetA(){run=false;fD=[];aR=[];ps=10;exG=new Set();const m=document.getElementById('msgs');[...m.children].forEach(c=>{if(c.id!=='intro')c.remove()});document.getElementById('suggs').style.display='';document.getElementById('empty').style.display='flex';document.getElementById('pip').style.display='none';document.getElementById('resH').style.display='none';document.getElementById('tsc').style.display='none';document.getElementById('san').style.display='none';document.getElementById('dlBtn').disabled=true;document.getElementById('elap').style.display='none';document.getElementById('inp').value='';document.getElementById('tb').innerHTML='';['query','search','scrape','extract','score'].forEach(rPh);renS()}
-function renS(){const l=document.getElementById('suggL');l.innerHTML='';SUGGS.forEach(s=>{const e=document.createElement('div');e.className='fsg-i';e.onclick=()=>{e.classList.add('used');runQ(s.t)};const p=s.t.length>88?s.t.slice(0,85)+'…':s.t;e.innerHTML=`<div class="fsg-arr">→</div><div><div class="fsg-txt">${esc(p)}</div><div class="fsg-tag">${esc(s.tag)}</div></div>`;l.appendChild(e)})}
+function renS(){const l=document.getElementById('suggL');l.innerHTML='';SUGGS.forEach(s=>{const e=document.createElement('div');e.className='fsg-i';e.onclick=()=>{e.classList.add('used');runQ(s.t)};const p=s.t.length>130?s.t.slice(0,127)+'…':s.t;e.innerHTML=`<div class="fsg-arr">→</div><div style="min-width:0"><div class="fsg-txt">${esc(p)}</div><div class="fsg-tag">${esc(s.tag)}</div></div>`;l.appendChild(e)})}
 function addU(t){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fm fm-u';d.innerHTML=`<div class="fb fb-u">${esc(t)}</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
 function addA(h){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fm fm-a';d.innerHTML=`<div class="fav"><svg viewBox="0 0 20 20" class="rob" style="width:14px;height:14px"><rect x="4" y="6" width="12" height="9" rx="2"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="12.5" cy="10" r="1.5"/><rect x="8" y="12" width="4" height="1.5" rx=".5"/><rect x="9" y="3" width="2" height="3" rx="1"/></svg></div><div class="fb fb-a">${h}</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
 function addTh(id){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fth';d.id=id;d.innerHTML=`<div class="fth-d"><span></span><span></span><span></span></div><div class="fth-t">Searching the web…</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
