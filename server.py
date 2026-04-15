@@ -881,6 +881,307 @@ async def search_sec_edgar(
     return [r for r in flat if r["url"] not in seen and not seen.add(r["url"])]  # type: ignore[func-returns-value]
 
 
+# ── Step 2c: Claude Web Search ────────────────────────────────────────────────
+# Uses Anthropic's native web_search tool — runs AFTER Exa.
+# Returns results in the same shape as search_exa() / search_parallel_ai().
+CLAUDE_WEB_SEARCH_MODEL = "claude-3-5-sonnet-20241022"
+
+async def search_claude_web(
+    client: httpx.AsyncClient,
+    queries: list[str],
+    max_days: int = 180,
+) -> list[dict]:
+    """
+    Run the top 3 queries through Claude's built-in web search tool.
+    Claude autonomously decides which URLs to fetch and surfaces structured results.
+
+    Waterfall position: runs AFTER Exa, BEFORE PAI.
+    Only the top 3 queries are sent — Claude web search is slower and costlier
+    than Exa, so we use it for depth, not breadth.
+    """
+    if not ANTHROPIC_API_KEY:
+        return []
+
+    out: list[dict] = []
+
+    async def _one(q: str) -> list[dict]:
+        try:
+            resp = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key":        ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type":      "application/json",
+                    "anthropic-beta":    "web-search-2025-03-05",
+                },
+                json={
+                    "model":      CLAUDE_WEB_SEARCH_MODEL,
+                    "max_tokens": 2000,
+                    "tools": [
+                        {
+                            "type": "web_search_20250305",
+                            "name": "web_search",
+                            "max_uses": 3,
+                        }
+                    ],
+                    "messages": [
+                        {
+                            "role":    "user",
+                            "content": (
+                                f"Search the web for: {q}\n\n"
+                                f"Return a list of relevant companies/articles published in the last {max_days} days. "
+                                f"For each result include: URL, title, company name, and a 1-2 sentence excerpt."
+                            ),
+                        }
+                    ],
+                },
+                timeout=45,
+            )
+            resp.raise_for_status()
+            data    = resp.json()
+            results = []
+
+            # Walk content blocks — extract tool_result blocks which contain search hits
+            for block in data.get("content", []):
+                if block.get("type") == "tool_result":
+                    for item in (block.get("content") or []):
+                        if isinstance(item, dict) and item.get("type") == "text":
+                            # Parse any URLs mentioned in the text block
+                            urls_found = re.findall(r'https?://[^\s\)\]"\']+', item.get("text", ""))
+                            for url in urls_found[:10]:
+                                src_domain = extract_domain_from_url(url)
+                                results.append({
+                                    "url":                url,
+                                    "domain":             src_domain,
+                                    "news_source_domain": src_domain,
+                                    "title":              "",
+                                    "date":               "",
+                                    "snippet":            item.get("text", "")[:400],
+                                    "company_name":       src_domain.split(".")[0].replace("-", " ").title(),
+                                    "company_domain":     src_domain,
+                                    "source":             "claude_web",
+                                    "_highlights":        [],
+                                })
+                # Also capture the assistant's final text response — it often lists companies
+                elif block.get("type") == "text":
+                    text = block.get("text", "")
+                    # Extract any URLs from the narrative
+                    urls_found = re.findall(r'https?://[^\s\)\]"\'<>]+', text)
+                    for url in urls_found[:15]:
+                        src_domain = extract_domain_from_url(url)
+                        if src_domain and src_domain not in _MEDIA_DOMAINS:
+                            # Find title near the URL in the text
+                            pos     = text.find(url)
+                            context = text[max(0, pos-150):pos+200]
+                            results.append({
+                                "url":                url,
+                                "domain":             src_domain,
+                                "news_source_domain": src_domain,
+                                "title":              "",
+                                "date":               "",
+                                "snippet":            context.strip()[:400],
+                                "company_name":       src_domain.split(".")[0].replace("-", " ").title(),
+                                "company_domain":     src_domain,
+                                "source":             "claude_web",
+                                "_highlights":        [],
+                            })
+            return results
+
+        except Exception as e:
+            print(f"Claude web search error for '{q[:60]}': {e}")
+            return []
+
+    # Run top 3 queries in parallel
+    batches = await asyncio.gather(*[_one(q) for q in queries[:3]])
+    flat = [r for b in batches for r in b]
+    seen: set[str] = set()
+    return [r for r in flat if r["url"] not in seen and not seen.add(r["url"])]  # type: ignore[func-returns-value]
+
+
+# ── Step 2d: Parallel AI FindAll API ─────────────────────────────────────────
+# FindAll is an async company-discovery API — NOT a search API.
+# Use it when the user is asking for a LIST of COMPANIES matching criteria,
+# as opposed to articles/blog posts (which the search API handles better).
+FINDALL_BASE   = "https://api.parallel.ai/v1beta/findall"
+FINDALL_BETA   = "findall-2025-09-15"
+FINDALL_HEADERS = {
+    "x-api-key":      "",   # filled at runtime from PARALLEL_AI_KEY
+    "Content-Type":   "application/json",
+    "parallel-beta":  FINDALL_BETA,
+}
+
+# Heuristic: queries that want a list of companies → FindAll
+# Queries about articles/blog posts → agentic search
+_FINDALL_TRIGGERS = re.compile(
+    r'\b(find|list|show|give me|identify|which)\b.{0,40}'
+    r'\b(companies|startups?|firms?|organizations?|businesses?|vendors?)\b',
+    re.IGNORECASE,
+)
+_ARTICLE_SIGNALS = re.compile(
+    r'\b(blog post|article|news|published|engineering blog|post|wrote|writing|press release|announcement)\b',
+    re.IGNORECASE,
+)
+
+def _should_use_findall(question: str) -> bool:
+    """
+    Return True when the user clearly wants a company list, not articles.
+    If the query mentions both companies AND blog posts, prefer the search API
+    (it returns richer content-level evidence).
+    """
+    wants_companies = bool(_FINDALL_TRIGGERS.search(question))
+    wants_articles  = bool(_ARTICLE_SIGNALS.search(question))
+    return wants_companies and not wants_articles
+
+
+def _build_findall_payload(question: str, requested_count: int, entity_type: str) -> dict:
+    """Convert the user's question into a FindAll /runs request payload."""
+    # Generator tier: use 'core' for standard queries, 'pro' for large counts
+    generator  = "pro" if requested_count > 100 else "core"
+    match_limit = max(requested_count, 50) if requested_count > 0 else 50
+
+    # Build match_conditions from the question's key intent phrases
+    topic_kws = _extract_topic_keywords(question)
+    core      = " ".join(topic_kws[:6])
+
+    return {
+        "objective":        question,
+        "entity_type":      entity_type,       # "startup", "enterprise", or "company"
+        "match_conditions": [
+            {
+                "name":        "Matches user objective",
+                "description": question,
+            },
+            {
+                "name":        "Core topic match",
+                "description": f"Company is related to: {core}",
+            },
+        ],
+        "generator":   generator,
+        "match_limit": match_limit,
+    }
+
+
+async def search_parallel_findall(
+    client: httpx.AsyncClient,
+    question: str,
+    requested_count: int = 0,
+    entity_type: str = "company",
+) -> list[dict]:
+    """
+    Async company-discovery via Parallel AI FindAll API.
+
+    Flow:
+      1. POST /ingest  — get structured schema from objective
+      2. POST /runs    — start async discovery job → findall_id
+      3. Poll GET /runs/{id} until status == "completed" (max 90s)
+      4. GET /runs/{id}/result — fetch matched candidates
+
+    Returns results in the same shape as search_exa() / search_parallel_ai().
+    """
+    headers = {**FINDALL_HEADERS, "x-api-key": PARALLEL_AI_KEY}
+
+    # ── Step 1: Ingest — get structured schema ────────────────────────────────
+    try:
+        ingest_resp = await client.post(
+            f"{FINDALL_BASE}/ingest",
+            headers=headers,
+            json={"objective": question},
+            timeout=20,
+        )
+        ingest_resp.raise_for_status()
+        print(f"FindAll /ingest OK: {ingest_resp.json().get('schema_id', 'no-id')}")
+    except Exception as e:
+        print(f"FindAll /ingest failed: {e}")
+        return []
+
+    # ── Step 2: Start async discovery run ────────────────────────────────────
+    payload = _build_findall_payload(question, requested_count, entity_type)
+    try:
+        run_resp = await client.post(
+            f"{FINDALL_BASE}/runs",
+            headers=headers,
+            json=payload,
+            timeout=20,
+        )
+        run_resp.raise_for_status()
+        findall_id = run_resp.json().get("id") or run_resp.json().get("findall_id")
+        if not findall_id:
+            print("FindAll /runs returned no id")
+            return []
+        print(f"FindAll /runs started: {findall_id}")
+    except Exception as e:
+        print(f"FindAll /runs failed: {e}")
+        return []
+
+    # ── Step 3: Poll until completed (max 90s, 5s intervals) ─────────────────
+    max_wait   = 90
+    poll_every = 5
+    waited     = 0
+    while waited < max_wait:
+        await asyncio.sleep(poll_every)
+        waited += poll_every
+        try:
+            status_resp = await client.get(
+                f"{FINDALL_BASE}/runs/{findall_id}",
+                headers=headers,
+                timeout=10,
+            )
+            status_resp.raise_for_status()
+            status_data = status_resp.json()
+            status      = status_data.get("status", "")
+            metrics     = status_data.get("metrics", {})
+            print(f"FindAll poll [{waited}s]: status={status} matched={metrics.get('matched_candidates',0)}")
+            if status in ("completed", "done", "finished"):
+                break
+            if status in ("failed", "error"):
+                print(f"FindAll job failed: {status_data}")
+                return []
+        except Exception as e:
+            print(f"FindAll poll error: {e}")
+
+    # ── Step 4: Fetch results ─────────────────────────────────────────────────
+    try:
+        result_resp = await client.get(
+            f"{FINDALL_BASE}/runs/{findall_id}/result",
+            headers=headers,
+            timeout=20,
+        )
+        result_resp.raise_for_status()
+        candidates = result_resp.json().get("candidates", [])
+    except Exception as e:
+        print(f"FindAll /result failed: {e}")
+        return []
+
+    # ── Map candidates → standard result shape ────────────────────────────────
+    out: list[dict] = []
+    for c in candidates:
+        if c.get("match_status") != "matched":
+            continue
+        url        = c.get("url", "")
+        name       = c.get("name", "")
+        desc       = c.get("description", "")
+        src_domain = extract_domain_from_url(url) or infer_company_domain(name)
+        # basis = list of citations with reasoning
+        basis      = c.get("basis") or []
+        snippet    = basis[0].get("reasoning", desc) if basis else desc
+
+        out.append({
+            "url":                url or f"https://{src_domain}",
+            "domain":             src_domain,
+            "news_source_domain": src_domain,
+            "title":              name,
+            "date":               "",
+            "snippet":            snippet[:500],
+            "company_name":       name,
+            "company_domain":     src_domain,
+            "source":             "parallel_findall",
+            "_highlights":        [snippet] if snippet else [],
+        })
+
+    print(f"FindAll returned {len(out)} matched candidates")
+    return out
+
+
 # ── Step 3: Scrape URLs with Firecrawl (Parallel AI Extract fallback) ─────────
 # Returns: (content_map, fc_success_count, pai_extract_success_count)
 async def scrape_urls(client: httpx.AsyncClient, urls: list[str]) -> tuple[dict[str, str], int, int]:
@@ -1732,11 +2033,32 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
 
         async def _noop() -> list: return []
 
-        pai_results, exa_results, sec_results = await asyncio.gather(
-            search_parallel_ai(client, queries, requested_count=requested_count)              if use_pai else _noop(),
-            search_exa(client, queries, max_days=max_days, requested_count=requested_count)  if use_exa else _noop(),
-            search_sec_edgar(client, queries, max_days=max_days)                             if use_sec else _noop(),
+        # Detect if FindAll is appropriate for this query
+        use_findall = use_pai and _should_use_findall(question)
+
+        # ── Waterfall: Exa → Claude web search → PAI (if needed) ──────────────
+        # Phase A: Exa + Claude web search run in parallel (both are retrieval-first).
+        # PAI (FindAll or agentic) runs in Phase A too for SEC/company queries,
+        # then Round 2 only fires if Phase A total is thin (< 50 unique domains).
+
+        pai_task = (
+            search_parallel_findall(client, question, requested_count=requested_count, entity_type=entity_type)
+            if use_findall
+            else search_parallel_ai(client, queries, requested_count=requested_count)
+            if use_pai
+            else _noop()
         )
+
+        pai_results, exa_results, claude_web_results, sec_results = await asyncio.gather(
+            pai_task,
+            search_exa(client, queries, max_days=max_days, requested_count=requested_count) if use_exa else _noop(),
+            search_claude_web(client, queries, max_days=max_days)                            if use_exa else _noop(),
+            search_sec_edgar(client, queries, max_days=max_days)                            if use_sec else _noop(),
+        )
+
+        # Log which source FindAll was used
+        if use_findall:
+            print(f"FindAll mode active — returned {len(pai_results)} company candidates")
 
         def _merge_dedup(lists: list[list[dict]]) -> list[dict]:
             seen: set[str] = set()
@@ -1747,7 +2069,7 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
                     out.append(r)
             return out
 
-        all_results = _merge_dedup([pai_results, exa_results, sec_results])
+        all_results = _merge_dedup([pai_results, exa_results, claude_web_results, sec_results])
 
         # ── Round 2: targeted re-search if first pass is thin ──
         round2_pai: list[dict] = []
@@ -1783,19 +2105,26 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
             return r.get("domain", "") in _MEDIA_DOMAINS
         all_results.sort(key=_is_media)
 
-        total_pai = len(pai_results) + len(round2_pai)
-        total_exa = len(exa_results) + len(round2_exa)
-        total_sec = len(sec_results)
-        rounds_run = 2 if (round2_pai or round2_exa) else 1
+        total_pai       = len(pai_results) + len(round2_pai)
+        total_exa       = len(exa_results) + len(round2_exa)
+        total_claude    = len(claude_web_results)
+        total_sec       = len(sec_results)
+        rounds_run      = 2 if (round2_pai or round2_exa) else 1
+        pai_mode_label  = "FindAll" if use_findall else "PAI Agentic"
         yield sse("phase", {
             "phase": "search", "status": "done",
-            "msg": (f"Found {len(all_results)} unique URLs across {rounds_run} round(s) — "
-                    f"Parallel AI: {total_pai} · Exa: {total_exa} · SEC API: {total_sec}"),
-            "parallel_ai_count": total_pai,
-            "exa_count":         total_exa,
-            "sec_api_count":     total_sec,
-            "unique_urls":       len(all_results),
-            "search_rounds":     rounds_run,
+            "msg": (
+                f"Found {len(all_results)} unique URLs across {rounds_run} round(s) — "
+                f"Exa: {total_exa} · Claude Web: {total_claude} · "
+                f"{pai_mode_label}: {total_pai} · SEC: {total_sec}"
+            ),
+            "parallel_ai_count":  total_pai,
+            "exa_count":          total_exa,
+            "claude_web_count":   total_claude,
+            "sec_api_count":      total_sec,
+            "findall_mode":       use_findall,
+            "unique_urls":        len(all_results),
+            "search_rounds":      rounds_run,
         })
 
         # ── Phase 3: Snippet-first scoring (free — no API call) ──
@@ -2048,8 +2377,10 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
                 "urls_discovered":      len(all_results),
                 "pages_scraped":        len(scraped),
                 "pages_with_evidence":  len(relevant),
-                "parallel_ai_urls":     len(pai_results),
                 "exa_urls":             len(exa_results),
+                "claude_web_urls":      len(claude_web_results),
+                "parallel_ai_urls":     len(pai_results),
+                "findall_mode":         use_findall,
             },
             "sanity_report": {
                 "max_days_filter":   max_days,

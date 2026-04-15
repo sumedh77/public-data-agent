@@ -344,11 +344,11 @@ const HIST=[
   {id:5,q:'Companies building AI agents for customer onboarding or support deflection',dt:'2026-04-05T10:20:00',cos:6,sigs:8,ico:'🤖'},
 ];
 const SUGGS=[
-  {t:'Which B2B SaaS companies announced a new VP of Customer Success in the last 90 days?',tag:'🚨 Trigger · New exec'},
-  {t:'Find companies that raised Series B or C and published content about scaling CS',tag:'🚨 Trigger · Funding + GTM'},
-  {t:'Find companies writing about customer churn, retention, or onboarding friction in the last 6 months',tag:'😰 Pain · Churn'},
-  {t:'Engineering teams building internal customer dashboards or health score systems',tag:'🏗️ Build vs Buy'},
-  {t:'Companies building AI agents for onboarding or support deflection — last 3 months',tag:'🤖 AI · Agentic CS'},
+  {t:'Engineering blog posts from the last 90 days where the author describes MIGRATING from one AI framework or orchestration approach to another — switching from LangChain to custom, moving from single-model to multi-agent, replacing a vendor, or rebuilding an internal tool',tag:'🔀 Migration · AI Framework'},
+  {t:'News coverage or blog posts where companies describe deploying AI agents in REGULATED industries — healthcare, financial services, insurance, legal, government — specifically mentioning compliance, audit trails, explainability, or regulatory requirements',tag:'🏛️ Regulated · AI Compliance'},
+  {t:'News articles about companies that ACQUIRED an AI startup or acqui-hired an AI team in the last 6 months — specifically where the acquisition was described as bringing AI capabilities in-house',tag:'🤝 M&A · AI Acqui-hire'},
+  {t:'Blog posts, published talks, or articles where CISOs or security leaders describe the challenges of securing AI systems, LLM deployments, or agent-based workflows — specifically the gaps in their existing security stack',tag:'🔒 CISO · AI Security Gaps'},
+  {t:'Companies that appear across MULTIPLE security signal types — mentioned in AI breach news OR publishing about AI security challenges AND operating in a regulated industry AND having recently announced AI product deployments — stacked security signals within a 90-day window',tag:'⚠️ Stacked · Security Signals'}
 ];
 const MOCK={total_companies:14,companies:[
   {company_name:'Vitally',company_domain:'vitally.io',evidence:[{company_name:'Vitally',company_domain:'vitally.io',news_source_domain:'vitally.io',url:'https://vitally.io/blog/reducing-churn',title:'Reducing Churn at Scale',content_type:'blog post',key_excerpt:'Proactive churn playbooks within 30 days → 34% better net retention.',confidence:.92,date:'2026-03-18'},{company_name:'Vitally',company_domain:'vitally.io',news_source_domain:'vitally.io',url:'https://vitally.io/blog/onboarding-friction',title:'We Audited Our Onboarding',content_type:'blog post',key_excerpt:'Median TTV was 23 days, cut to 9. Onboarding friction was #1 churn driver.',confidence:.88,date:'2026-02-05'}]},
