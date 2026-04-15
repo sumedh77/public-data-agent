@@ -1126,21 +1126,23 @@ async def _extract_subjects_batch(client: httpx.AsyncClient, batch: list[dict], 
     prompt = f"""You are a strict B2B Data Analyst mapping insights to true commercial subjects.
 The user specifically asked for: "{question}"
 
-I will provide an array of web snippets. Your job is to extract the ACTUAL company performing the core action (e.g., the company raising funds, the company building AI), NOT the news outlet, press wire, or directory listing the article.
+I will provide an array of web snippets. Your job is twofold:
+1. Extract the ACTUAL subject company performing the core action (e.g., the company raising funds, the company building AI), NOT the news outlet, press wire, or directory listing the article.
+2. Write a highly concise 1-2 sentence `aligned_signal` that directly answers the user's query based on the snippet. Do not use generic filler words like "This article discusses...". Make it punchy, specific, and insightful (e.g., mention the specific executive, the exact technology used, etc.).
 
 Rules:
 1. If prnewswire.com or stocktitan.net publishes "Acme Corp Raises $10M Series A", the subject is "Acme Corp", domain "acme.com". NOT PRNewswire or Stocktitan.
 2. If ycombinator.com lists a startup directory entry for "Brex", the subject is "Brex", domain "brex.com". NOT Ycombinator.
 3. If wellfound.com or crunchbase.com has a profile page for "Notion", the subject is "Notion", domain "notion.so". NOT Wellfound.
-4. If it is a generic "How-to" guide published by a company (e.g. "How to migrate" by HubSpot), then the subject is just HubSpot / hubspot.com.
+4. If it is a generic "How-to" guide published by a company, the subject is the publisher.
 5. If it's a first-person post ("We migrated.."), the subject is the publisher.
-6. If a company name is not obvious, use "unknown" for both fields.
+6. If a company name is not obvious or it is purely a generic news roundup, explicitly output "unknown" for both company and domain. DO NOT guess the news outlet.
 7. NEVER use a news site, press wire, or aggregator as the subject_company.
 
 Return ONLY a JSON object:
 {{
   "extractions": [
-    {{"url": "...", "subject_company": "Acme Corp", "subject_domain": "acme.com"}}
+    {{"url": "...", "subject_company": "Acme Corp", "subject_domain": "acme.com", "aligned_signal": "Acme Corp's CTO published a detailed architecture guide on their transition to AI agents."}}
   ]
 }}
 
@@ -1694,30 +1696,40 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
             # Use AI Extractor as the absolute source of truth if available (except for SEC filings)
             is_sec = meta.get("source") == "sec_edgar"
             ai_data = ai_entities.get(ev["url"], {}) if not is_sec else {}
-            co_name = ai_data.get("subject_company") or meta.get("company_name") or ev.get("company_name") or ""
             
-            # Resolve domain priorities: AI > Meta > Regex Inference
-            co_domain = ai_data.get("subject_domain") or meta.get("company_domain") or _resolve_company_domain(co_name, url_domain)
+            ai_company = ai_data.get("subject_company", "")
+            if ai_company:
+                if ai_company.lower() == "unknown":
+                    co_name = "unknown"
+                    co_domain = "unknown"
+                else:
+                    co_name = ai_company
+                    co_domain = ai_data.get("subject_domain") or _resolve_company_domain(co_name, url_domain)
+            else:
+                co_name = meta.get("company_name") or ev.get("company_name") or ""
+                co_domain = meta.get("company_domain") or _resolve_company_domain(co_name, url_domain)
 
             # News source = the URL's actual domain (the page we fetched)
             news_src = url_domain
 
             # Fall back: if co_name still empty, derive from resolved domain
-            if not co_name:
-                co_name = co_domain.split('.')[0].replace('-', ' ').title()
+            if not co_name or co_name == "unknown":
+                co_name = co_domain.split('.')[0].replace('-', ' ').title() if co_domain != "unknown" else "unknown"
 
             domain    = co_domain or url_domain
             canonical = entity_resolver.resolve(co_name, domain) or domain
             if co_name:
                 entity_resolver.learn(canonical, co_name)
 
+            aligned_signal = ai_data.get("aligned_signal")
+            
             record = {
                 "url":                ev["url"],
                 "title":              meta.get("title", ev.get("url", "")),
                 "date":               ev.get("published_date") or meta.get("date", ""),
                 "content_type":       ev.get("content_type", ""),
-                "key_excerpt":        ev.get("key_excerpt", ""),
-                "summary":            ev.get("summary", ""),
+                "key_excerpt":        aligned_signal if aligned_signal else ev.get("key_excerpt", ""),
+                "summary":            aligned_signal if aligned_signal else ev.get("summary", ""),
                 "confidence":         float(ev.get("confidence", 0.5)),
                 "discovered_via":     meta.get("source", "unknown"),
                 "snippet":            meta.get("snippet", ""),
