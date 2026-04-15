@@ -181,6 +181,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
 .sc-md{background:var(--aml);color:#d97706;border:1px solid var(--amb2)}
 .sc-lo{background:var(--redl);color:var(--red);border:1px solid #fca5a5}
 .sig-t{font-size:10.5px;color:var(--ts);line-height:1.55;min-width:200px;max-width:320px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sig-wrap{position:relative;display:block;cursor:pointer}
+.sig-wrap:hover .sig-tip{opacity:1;pointer-events:auto;transform:translateY(0)}
+.sig-tip{position:absolute;left:0;top:100%;z-index:9999;background:#1e293b;color:#e2e8f0;font-size:11.5px;line-height:1.65;padding:11px 14px;border-radius:8px;max-width:400px;min-width:240px;white-space:normal;box-shadow:0 8px 30px rgba(0,0,0,.3);opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .15s ease,transform .15s ease;margin-top:6px;font-family:var(--sans);border:1px solid rgba(255,255,255,.08)}
 .dt-m{font-family:var(--mono);font-size:10px;white-space:nowrap}
 .dt-r{font-family:var(--mono);font-size:8px;margin-top:3px;display:inline-block;padding:1px 5px;border-radius:3px;white-space:nowrap}
 .rc-f{background:var(--grl);color:var(--grn)}.rc-o{background:var(--grl);color:var(--grn)}.rc-w{background:var(--aml);color:#d97706}.rc-d{background:var(--bg);color:var(--tm)}
@@ -322,7 +325,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
         <div class="fr-title"><span id="resCnt">Results</span></div>
         <button class="fr-dl" id="dlBtn" onclick="dl()" disabled><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="10" height="10"><path d="M4 13h8M8 3v7M5 7l3 3 3-3"/></svg>Download CSV</button>
       </div>
-      <div class="tsc" id="tsc" style="display:none"><table class="tbl"><thead><tr><th>Company</th><th>Domain</th><th>Source</th><th>Type</th><th>Signal</th><th>Score</th><th>Published</th><th>GitHub</th><th>Proof</th><th>Next Step</th></tr></thead><tbody id="tb"></tbody></table><div class="pg" id="pgB"><span style="font-family:var(--mono);font-size:9px;color:var(--tm);letter-spacing:.06em">SHOW</span><div style="display:flex;gap:4px"><button class="pg-p active" onclick="sps(10,this)">10</button><button class="pg-p" onclick="sps(25,this)">25</button><button class="pg-p" onclick="sps(0,this)">All</button></div><span id="pgS" style="font-family:var(--mono);font-size:9px;color:var(--tm);margin-left:4px"></span></div></div>
+      <div class="tsc" id="tsc" style="display:none"><table class="tbl"><thead><tr><th>Company</th><th>Domain</th><th>Source</th><th>Type</th><th>Signal</th><th>Score</th><th>Published</th><th>Proof</th><th>Next Step</th></tr></thead><tbody id="tb"></tbody></table><div class="pg" id="pgB"><span style="font-family:var(--mono);font-size:9px;color:var(--tm);letter-spacing:.06em">SHOW</span><div style="display:flex;gap:4px"><button class="pg-p active" onclick="sps(10,this)">10</button><button class="pg-p" onclick="sps(25,this)">25</button><button class="pg-p" onclick="sps(0,this)">All</button></div><span id="pgS" style="font-family:var(--mono);font-size:9px;color:var(--tm);margin-left:4px"></span></div></div>
       <div class="san" id="san"></div>
     </div>
 
@@ -522,19 +525,26 @@ function evC(r,sub){
   const{dt,rc,rl,v}=r.di;const fullExcerpt=r.ke||r.title||'';const ex=fullExcerpt.slice(0,sub?100:140);const u=r.url||'',ud=u.replace(/^https?:\/\/(www\.)?/,'').slice(0,34);const ns=r.nsd||domOf(u);const n=nxS(r);
   let dc=v&&dt?`<div class="dt-m">${esc(dt)}</div><span class="dt-r ${rc}">${esc(rl)}</span>`:`<span style="font-family:var(--mono);font-size:8px;color:#c2410c">⚠ unverified</span>`;
   const sd=sub?`<td style="padding-left:8px;border-left:2px solid var(--border)"><span style="font-family:var(--mono);font-size:9px;color:var(--tm)">${esc(ns)}</span></td>`:`<td><div class="co-w"><img src="https://www.google.com/s2/favicons?domain=${ns}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-f"/><div class="co-n" style="color:var(--ts);font-size:10.5px">${esc(ns)}</div></div></td>`;
-  // Signal cell: truncated display with full text tooltip + link to proof URL
-  const sigCell=`<td><a href="${esc(u)}" target="_blank" onclick="event.stopPropagation()" style="text-decoration:none;color:inherit;display:block" title="${esc(fullExcerpt)}"><div class="sig-t" style="cursor:pointer">${esc(ex)}${fullExcerpt.length>140?'…':''}</div></a></td>`;
-  return`${sd}<td><span class="ct-b ${ctC}">${esc(ctL)}</span></td>${sigCell}<td><span class="sc-p ${scC}">${Math.round(sc*100)}%</span></td><td>${dc}</td><td id="gh-${sub?'s':'m'}-${(r.cd||domOf(r.url||'')).replace(/\./g,'-')}"><span style="font-family:var(--mono);font-size:9px;color:var(--tm)">…</span></td><td><a href="${esc(u)}" target="_blank" onclick="event.stopPropagation()" class="pu" title="${esc(u)}" style="text-decoration:none;">${esc(ud)}${ud.length>=34?'…':''}</a></td><td><span class="ns-p ${n.c}">${n.i} ${esc(n.a)}</span></td>`}
+  // Signal cell: styled dark tooltip on hover + proof link on click
+  const tipHtml = fullExcerpt.length > 80 ? `<div class="sig-tip">${esc(fullExcerpt.slice(0,500))}${fullExcerpt.length>500?'…':''}</div>` : '';
+  const sigCell=`<td><a href="${esc(u)}" target="_blank" onclick="event.stopPropagation()" style="text-decoration:none;color:inherit;display:block"><div class="sig-wrap"><div class="sig-t">${esc(ex)}${fullExcerpt.length>140?'…':''}</div>${tipHtml}</div></a></td>`;
+  // Source cell (what domain the article came from)
+  const srcCell = sub ? '' : `<td><span style="font-family:var(--mono);font-size:9px;color:var(--tm)">${esc(ns)}</span></td>`;
+  return`${sd}${srcCell}<td><span class="ct-b ${ctC}">${esc(ctL)}</span></td>${sigCell}<td><span class="sc-p ${scC}">${Math.round(sc*100)}%</span></td><td>${dc}</td><td><a href="${esc(u)}" target="_blank" onclick="event.stopPropagation()" class="pu" title="${esc(u)}" style="text-decoration:none;">${esc(ud)}${ud.length>=34?'…':''}</a></td><td><span class="ns-p ${n.c}">${n.i} ${esc(n.a)}</span></td>`}
 
+const _NEWS_FILTER=new Set(['techcrunch.com','bloomberg.com','forbes.com','reuters.com','wsj.com','ft.com','wired.com','venturebeat.com','crunchbase.com','businessinsider.com','cnbc.com','theverge.com','zdnet.com','prnewswire.com','businesswire.com','globenewswire.com','stocktitan.net','ycombinator.com','marketwatch.com','infoq.com','geekwire.com','techradar.com','theregister.com','apnews.com','inc.com']);
 function renT(rows){
   const tb=document.getElementById('tb');tb.innerHTML='';
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--tm)">No results found.</td></tr>`;document.getElementById('tsc').style.display='block';return}
-  const ag=grpR(rows),dg=ps===0?ag:ag.slice(0,ps);
+  // Filter: remove rows where company domain is a known news/aggregator site or 'unknown'
+  const filtered=rows.filter(r=>{const d=(r.cd||'').toLowerCase();return d&&d!=='unknown'&&!_NEWS_FILTER.has(d);});
+  if(!filtered.length){tb.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--tm)">No results found.</td></tr>`;document.getElementById('tsc').style.display='block';return}
+  const ag=grpR(filtered),dg=ps===0?ag:ag.slice(0,ps);
   document.getElementById('pgB').style.display='flex';document.getElementById('pgS').textContent=ag.length>dg.length?`${dg.length} of ${ag.length} companies`:`All ${ag.length} companies`;
   dg.forEach(([d,cr])=>{const b=cr[0],hm=cr.length>1,ie=exG.has(d),cn=b.cn||d.split('.')[0];
     const tr=document.createElement('tr');tr.style.cssText='cursor:pointer;background:var(--white)';tr.onmouseover=()=>tr.style.background='var(--prl)';tr.onmouseout=()=>tr.style.background='var(--white)';if(hm)tr.onclick=()=>togG(d);
     const eb=hm?`<span style="font-family:var(--mono);font-size:9px;color:var(--pri);margin-left:5px">${ie?'▾':'▸'}${cr.length}</span>`:'';
-    tr.innerHTML=`<td><div class="co-w"><img src="https://www.google.com/s2/favicons?domain=${d}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-f"/><div class="co-n">${esc(cn)}${eb}</div></div></td><td><span style="font-family:var(--mono);font-size:10px;color:var(--pri)">${esc(d)}</span></td>${evC(b,false)}`;
+    // Company name + clickable domain link
+    tr.innerHTML=`<td><div class="co-w"><img src="https://www.google.com/s2/favicons?domain=${d}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-f"/><div class="co-n">${esc(cn)}${eb}</div></div></td><td><a href="https://${esc(d)}" target="_blank" onclick="event.stopPropagation()" style="font-family:var(--mono);font-size:10px;color:var(--pri);text-decoration:none;border-bottom:1px dashed var(--prb);display:inline-block">${esc(d)}</a></td>${evC(b,false)}`;
     tb.appendChild(tr);
     if(ie&&hm)cr.slice(1).forEach(r=>{const ts=document.createElement('tr');ts.style.cssText='background:var(--bg)';ts.innerHTML=`<td></td><td></td>${evC(r,true)}`;tb.appendChild(ts)});
   });document.getElementById('tsc').style.display='block'}
