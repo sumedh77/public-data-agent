@@ -84,6 +84,71 @@ COST_HAIKU_OUT_PER_1M = 1.25
 COST_SONNET_IN_PER_1M  = 3.00
 COST_SONNET_OUT_PER_1M = 15.00
 
+# ── Model preference order (best → fallback) ──────────────────────────────────
+# The agent tries the best model first. If the API key doesn't have access
+# (404 not_found_error), it automatically retries with the fallback model.
+_QUALITY_MODELS = [
+    ("claude-3-5-sonnet-20241022", COST_SONNET_IN_PER_1M, COST_SONNET_OUT_PER_1M),
+    ("claude-3-5-haiku-20241022",  0.80,  4.00),   # newer Haiku — often accessible
+    ("claude-3-haiku-20240307",    COST_HAIKU_IN_PER_1M, COST_HAIKU_OUT_PER_1M),
+]
+
+async def _anthropic_call_with_fallback(
+    client: httpx.AsyncClient,
+    *,
+    system: str,
+    user_content: str,
+    max_tokens: int,
+    timeout: float = 90,
+    extra_headers: dict | None = None,
+) -> tuple[str, float]:
+    """
+    Try _QUALITY_MODELS in order. Returns (response_text, cost).
+    Falls back to the next model on 404 (model not found) or 529 (overloaded).
+    Raises on any other HTTP error.
+    """
+    headers_base = {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    if extra_headers:
+        headers_base.update(extra_headers)
+
+    last_err: Exception | None = None
+    for model, cost_in, cost_out in _QUALITY_MODELS:
+        try:
+            resp = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers=headers_base,
+                json={
+                    "model": model,
+                    "max_tokens": max_tokens,
+                    "system": system,
+                    "messages": [{"role": "user", "content": user_content}],
+                },
+                timeout=timeout,
+            )
+            if resp.status_code in (404, 529):
+                print(f"Model {model} returned {resp.status_code}, trying next…")
+                last_err = httpx.HTTPStatusError(resp.text, request=resp.request, response=resp)
+                continue
+            resp.raise_for_status()
+            data    = resp.json()
+            text    = data.get("content", [{}])[0].get("text", "")
+            usage   = data.get("usage", {})
+            cost    = (usage.get("input_tokens", 0) / 1_000_000) * cost_in \
+                    + (usage.get("output_tokens", 0) / 1_000_000) * cost_out
+            print(f"LLM call succeeded with model: {model}")
+            return text, cost
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code in (404, 529):
+                print(f"Model {model} not accessible ({e.response.status_code}), trying next…")
+                last_err = e
+                continue
+            raise
+    raise RuntimeError(f"All models failed. Last error: {last_err}")
+
 def log_query_metrics(query: str, tools_used: dict, llm_cost: float,
                       exa_cost: float, pai_cost: float, sec_cost: float, fc_cost: float,
                       distinct_domains: int, num_results: int,
@@ -1560,34 +1625,22 @@ Snippets:
 {json.dumps(batch)}"""
 
     try:
-        resp = await client.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={
-                "model": "claude-3-5-sonnet-20241022",
-                "max_tokens": 3000,
-                "system": (
-                    "Output only valid JSON. "
-                    "Never use news wires or aggregators as subject_company. "
-                    "Always name the specific person and title if present. "
-                    "aligned_signal must end with 'Proof: [url]'. "
-                    "Include all concrete specifics: dollar amounts, tool names, team sizes, percentages."
-                ),
-                "messages": [{"role": "user", "content": prompt}]
-            },
+        raw_text, ai_cost = await _anthropic_call_with_fallback(
+            client,
+            system=(
+                "Output only valid JSON. "
+                "Never use news wires or aggregators as subject_company. "
+                "Always name the specific person and title if present. "
+                "aligned_signal must end with 'Proof: [url]'. "
+                "Include all concrete specifics: dollar amounts, tool names, team sizes, percentages."
+            ),
+            user_content=prompt,
+            max_tokens=3000,
             timeout=45,
         )
-        data = resp.json()
-        usage    = data.get("usage", {})
-        ai_cost  = (usage.get("input_tokens", 0) / 1_000_000) * COST_SONNET_IN_PER_1M \
-                 + (usage.get("output_tokens", 0) / 1_000_000) * COST_SONNET_OUT_PER_1M
-        raw_text = data.get("content", [{}])[0].get("text", "{}")
         json_match = re.search(r'\{.*\}', raw_text.replace('\n', ''), re.DOTALL)
         res = json.loads(json_match.group(0)) if json_match else json.loads(raw_text)
         return {str(item["id"]): item for item in res.get("extractions", []) if "id" in item}, ai_cost
-    except httpx.HTTPStatusError as e:
-        print(f"Subject Entity Extraction HTTP failed: {e.response.text}")
-        return {}, 0.0
     except Exception as e:
         print("Subject Entity Extraction failed via AI:", e)
         return {}, 0.0
@@ -1744,36 +1797,19 @@ RULES:
 - Return ONLY the markdown report. No preamble, no sign-off."""
 
     try:
-        resp = await client.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-3-5-sonnet-20241022",
-                "max_tokens": 4000,
-                "system": (
-                    "You are an elite B2B GTM intelligence analyst. "
-                    "Write structured markdown reports with Signal Type and Outreach Angle for every named entry. "
-                    "Be specific: name the person, the tool, the dollar amount, the date. "
-                    "Never write vague summaries. Every sentence must be actionable."
-                ),
-                "messages": [{"role": "user", "content": prompt}],
-            },
+        answer, cost = await _anthropic_call_with_fallback(
+            client,
+            system=(
+                "You are an elite B2B GTM intelligence analyst. "
+                "Write structured markdown reports with Signal Type and Outreach Angle for every named entry. "
+                "Be specific: name the person, the tool, the dollar amount, the date. "
+                "Never write vague summaries. Every sentence must be actionable."
+            ),
+            user_content=prompt,
+            max_tokens=4000,
             timeout=90,
         )
-        resp.raise_for_status()
-        data   = resp.json()
-        answer = data.get("content", [{}])[0].get("text", "Error synthesizing answer.")
-        usage  = data.get("usage", {})
-        cost   = (usage.get("input_tokens", 0) / 1_000_000) * COST_SONNET_IN_PER_1M \
-               + (usage.get("output_tokens", 0) / 1_000_000) * COST_SONNET_OUT_PER_1M
         return answer, cost
-    except httpx.HTTPStatusError as e:
-        print(f"Synthesis HTTP failed: {e.response.text}")
-        return f"API Error: {e.response.status_code} — {e.response.text}", 0.0
     except Exception as e:
         print(f"Synthesis failed: {e}")
         return f"An error occurred while synthesizing: {str(e)}", 0.0
