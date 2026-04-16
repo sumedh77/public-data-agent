@@ -13,6 +13,7 @@ import sqlite3
 import os
 from typing import Optional
 from typing import AsyncGenerator
+from urllib.parse import urlparse as _urlparse
 
 import httpx
 import uvicorn
@@ -3165,6 +3166,147 @@ async def check_github_endpoint(body: GithubCheckRequest):
             _check_one_domain(client, d) for d in domains
         ])
     return {"results": list(results)}
+
+
+# ── Web Tools: Scrape + GitHub finder ────────────────────────────────────────
+class WebToolsRequest(BaseModel):
+    url: str
+    mode: str = "scrape"   # "scrape" | "github" | "map"
+
+def _sse_wt(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+async def run_web_tools_pipeline(url: str, mode: str) -> AsyncGenerator[str, None]:
+    """
+    SSE generator for web tools.
+    mode=scrape  → Firecrawl scrape, return title + trimmed content + metadata
+    mode=github  → Firecrawl scrape + links, extract all GitHub URLs
+    mode=map     → Firecrawl map, return grouped URL list
+    """
+    yield _sse_wt("start", {"url": url, "mode": mode})
+
+    limits = httpx.Limits(max_connections=5, max_keepalive_connections=2)
+    async with httpx.AsyncClient(verify=False, limits=limits) as client:
+        try:
+            if mode == "map":
+                yield _sse_wt("progress", {"msg": "Mapping site structure…"})
+                resp = await client.post(
+                    f"{FIRECRAWL_URL}/map",
+                    headers={"Authorization": f"Bearer {FIRECRAWL_KEY}", "Content-Type": "application/json"},
+                    json={"url": url, "limit": 50},
+                    timeout=30,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                links: list[str] = data.get("links") or data.get("urls") or []
+                # Group by path depth
+                groups: dict[str, list[str]] = {}
+                for lnk in links:
+                    try:
+                        parts = _urlparse(lnk).path.strip("/").split("/")
+                        prefix = parts[0] if parts and parts[0] else "(root)"
+                    except Exception:
+                        prefix = "(other)"
+                    groups.setdefault(prefix, []).append(lnk)
+                yield _sse_wt("done", {
+                    "mode": "map",
+                    "url": url,
+                    "total": len(links),
+                    "groups": groups,
+                })
+
+            elif mode == "github":
+                yield _sse_wt("progress", {"msg": "Scraping for GitHub links…"})
+                r = await client.post(
+                    f"{FIRECRAWL_URL}/scrape",
+                    headers={"Authorization": f"Bearer {FIRECRAWL_KEY}", "Content-Type": "application/json"},
+                    json={"url": url, "formats": ["markdown", "links"], "onlyMainContent": False},
+                    timeout=30,
+                )
+                r.raise_for_status()
+                d = r.json()
+                if not d.get("success"):
+                    yield _sse_wt("done", {"mode": "github", "url": url, "error": "scrape_failed", "github_links": []})
+                    return
+                content  = d.get("data", {})
+                markdown = content.get("markdown", "")
+                links    = content.get("links") or []
+                # All GitHub links except login/signup
+                github_links = []
+                seen = set()
+                for lnk in links:
+                    if "github.com/" in lnk.lower() and not any(x in lnk.lower() for x in ["github.com/login", "github.com/signup"]):
+                        if lnk not in seen:
+                            seen.add(lnk)
+                            # Classify: org / repo / profile / other
+                            parts = [p for p in lnk.split("github.com/", 1)[-1].split("/") if p]
+                            if len(parts) == 0:
+                                kind = "home"
+                            elif len(parts) == 1:
+                                kind = "profile/org"
+                            elif len(parts) == 2:
+                                kind = "repo"
+                            else:
+                                kind = "path"
+                            github_links.append({"url": lnk, "kind": kind})
+                # Also scan markdown text for any GitHub mentions
+                text_links = GITHUB_URL_RE.findall(markdown)
+                for tl in text_links:
+                    if tl not in seen:
+                        seen.add(tl)
+                        parts = [p for p in tl.split("github.com/", 1)[-1].split("/") if p]
+                        kind = "profile/org" if len(parts) == 1 else ("repo" if len(parts) == 2 else "path")
+                        github_links.append({"url": tl, "kind": kind})
+                yield _sse_wt("done", {
+                    "mode": "github",
+                    "url": url,
+                    "has_github": len(github_links) > 0,
+                    "github_links": github_links,
+                    "page_title": (content.get("metadata") or {}).get("title", ""),
+                })
+
+            else:  # default: scrape
+                yield _sse_wt("progress", {"msg": "Scraping page content…"})
+                r = await client.post(
+                    f"{FIRECRAWL_URL}/scrape",
+                    headers={"Authorization": f"Bearer {FIRECRAWL_KEY}", "Content-Type": "application/json"},
+                    json={"url": url, "formats": ["markdown"], "onlyMainContent": True},
+                    timeout=30,
+                )
+                r.raise_for_status()
+                d = r.json()
+                if not d.get("success"):
+                    yield _sse_wt("done", {"mode": "scrape", "url": url, "error": "scrape_failed", "content": ""})
+                    return
+                content  = d.get("data", {})
+                markdown = (content.get("markdown") or "").strip()
+                meta     = content.get("metadata") or {}
+                title    = meta.get("title", "")
+                desc     = meta.get("description", "")
+                # Cap at 3000 chars for token efficiency
+                trimmed  = markdown[:3000] + ("…" if len(markdown) > 3000 else "")
+                # Count links from full markdown
+                link_count = len(re.findall(r'https?://', markdown))
+                yield _sse_wt("done", {
+                    "mode": "scrape",
+                    "url": url,
+                    "title": title,
+                    "description": desc,
+                    "content": trimmed,
+                    "full_length": len(markdown),
+                    "link_count": link_count,
+                })
+        except Exception as exc:
+            yield _sse_wt("error", {"msg": str(exc)})
+
+
+@app.post("/api/web-tools")
+async def web_tools_endpoint(body: WebToolsRequest):
+    return StreamingResponse(
+        run_web_tools_pipeline(body.url, body.mode),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/api/dashboard-stats")

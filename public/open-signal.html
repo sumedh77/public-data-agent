@@ -207,6 +207,58 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
 .sd{width:5px;height:5px;border-radius:50%;flex-shrink:0;display:inline-block}
 .sd-ok{background:var(--grn)}.sd-md{background:#d97706}.sd-lo{background:var(--red)}
 
+/* ═══ WEB TOOLS FULLSCREEN ═══ */
+.wt-panel{display:none;position:fixed;inset:0;z-index:201;background:var(--bg);flex-direction:column}
+.wt-panel.open{display:flex}
+.wt-top{background:var(--white);border-bottom:1px solid var(--border);padding:0 20px;height:50px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.wt-badge{font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:4px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}
+.wt-body{display:flex;flex:1;overflow:hidden;min-height:0}
+.wt-left{width:360px;min-width:320px;background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.wt-form{padding:20px 20px 16px;border-bottom:1px solid var(--border)}
+.wt-form-lbl{font-size:11px;font-weight:600;color:var(--ts);margin-bottom:6px}
+.wt-url-w{display:flex;align-items:center;gap:8px;border:1.5px solid var(--bdk);border-radius:var(--r);padding:9px 12px;background:var(--bg);transition:border-color .15s}
+.wt-url-w:focus-within{border-color:var(--pri);background:var(--white)}
+.wt-url{flex:1;border:none;outline:none;font-family:var(--mono);font-size:11px;color:var(--text);background:transparent}
+.wt-url::placeholder{color:var(--tm);font-family:var(--sans)}
+.wt-modes{display:flex;gap:6px;margin-top:10px}
+.wt-mode{flex:1;padding:6px 8px;border-radius:var(--rs);border:1.5px solid var(--border);background:var(--white);font-family:var(--sans);font-size:11px;font-weight:500;color:var(--ts);cursor:pointer;text-align:center;transition:all .12s}
+.wt-mode:hover{border-color:var(--prb);color:var(--pri);background:var(--prl)}
+.wt-mode.active{border-color:var(--pri);background:var(--prl);color:var(--pri);font-weight:600}
+.wt-go{width:100%;margin-top:10px;padding:8px;border-radius:var(--rs);background:var(--pri);color:#fff;border:none;font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;transition:background .12s}
+.wt-go:hover{background:var(--prd)}.wt-go:disabled{opacity:.4;cursor:not-allowed}
+.wt-log{padding:12px 16px;font-family:var(--mono);font-size:9px;color:var(--tm);border-bottom:1px solid var(--border);min-height:28px;flex-shrink:0}
+.wt-hist{flex:1;overflow-y:auto;padding:12px 16px}
+.wt-hl{font-family:var(--mono);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--tm);margin-bottom:8px}
+.wt-hi{border:1px solid var(--border);border-radius:var(--rs);padding:8px 10px;margin-bottom:6px;cursor:pointer;transition:all .12s;background:var(--white)}
+.wt-hi:hover{border-color:var(--prb);background:var(--prl)}
+.wt-hi-url{font-family:var(--mono);font-size:9px;color:var(--pri);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wt-hi-m{font-size:10px;color:var(--tm);margin-top:2px}
+.wt-right{flex:1;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.wt-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--tm);text-align:center;padding:48px}
+.wt-empty p{font-size:12px;line-height:1.7;max-width:260px}
+.wt-res{flex:1;overflow-y:auto;padding:20px 24px;display:none}
+.wt-card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--rl);padding:20px 22px;margin-bottom:16px}
+.wt-card-hdr{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.wt-card-ico{width:36px;height:36px;border-radius:var(--r);background:linear-gradient(135deg,var(--pri),#818cf8);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.wt-card-ti{font-size:13px;font-weight:700;line-height:1.3;margin-bottom:3px}
+.wt-card-su{font-size:11px;color:var(--ts);line-height:1.5}
+.wt-meta{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.wt-chip{font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:4px;background:var(--prl);color:var(--pri);border:1px solid var(--prb)}
+.wt-chip.grn{background:var(--grl);color:var(--grn);border-color:var(--grb)}
+.wt-chip.amb{background:var(--aml);color:#d97706;border-color:var(--amb2)}
+.wt-content-lbl{font-family:var(--mono);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--tm);margin-bottom:8px}
+.wt-content-box{background:var(--bg);border:1px solid var(--border);border-radius:var(--rs);padding:14px 16px;font-size:11.5px;line-height:1.75;color:var(--ts);white-space:pre-wrap;word-break:break-word;max-height:420px;overflow-y:auto;font-family:var(--mono)}
+.wt-gh-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--rs);margin-bottom:6px;background:var(--white);transition:all .12s}
+.wt-gh-item:hover{border-color:var(--prb);background:var(--prl)}
+.wt-gh-kind{font-family:var(--mono);font-size:8.5px;padding:1px 6px;border-radius:3px;background:var(--grl);color:var(--grn);border:1px solid var(--grb);flex-shrink:0;white-space:nowrap}
+.wt-gh-url{font-family:var(--mono);font-size:10px;color:var(--pri);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.wt-gh-url:hover{text-decoration:underline}
+.wt-map-group{margin-bottom:14px}
+.wt-map-gn{font-size:11px;font-weight:600;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.wt-map-cnt{font-family:var(--mono);font-size:8.5px;background:var(--prl);color:var(--pri);border:1px solid var(--prb);padding:1px 6px;border-radius:4px}
+.wt-map-link{display:block;font-family:var(--mono);font-size:9.5px;color:var(--ts);padding:3px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.wt-map-link:hover{color:var(--pri)}
+
 /* ═══ HISTORY PANEL — overlay, not flex sibling ═══ */
 .hp{position:absolute;top:0;right:0;bottom:0;width:0;background:var(--white);border-left:1px solid var(--border);display:flex;flex-direction:column;transition:width .25s ease;overflow:hidden;z-index:10;box-shadow:-4px 0 20px rgba(0,0,0,.06)}
 .hp.open{width:280px}
@@ -282,6 +334,30 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
       <div class="cs"><div class="ch"><span>👥</span><span class="ct">Engineering Team Investments</span></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div class="ac"><div class="rav"><svg viewBox="0 0 20 20" class="rob"><rect x="4" y="6" width="12" height="9" rx="2"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="12.5" cy="10" r="1.5"/><rect x="8" y="12" width="4" height="1.5" rx=".5"/><rect x="9" y="3" width="2" height="3" rx="1"/></svg></div><div class="cn">Headcount Fit</div><div class="cd">Engineering team size matching your ICP.</div><div class="cf"><span class="ctg">Category</span><button class="cbtn">Chat & configure →</button></div></div><div class="ac"><div class="rav"><svg viewBox="0 0 20 20" class="rob"><rect x="4" y="6" width="12" height="9" rx="2"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="12.5" cy="10" r="1.5"/><rect x="8" y="12" width="4" height="1.5" rx=".5"/><rect x="9" y="3" width="2" height="3" rx="1"/></svg></div><div class="cn">Team Growing</div><div class="cd">Teams growing or shrinking by technology.</div><div class="cf"><span class="ctg">Category</span><button class="cbtn">Chat & configure →</button></div></div></div></div>
       <div class="cs"><div class="ch"><span>🔍</span><span class="ct">Open Signal Agent</span></div><div class="ac cust" onclick="openAgent()"><div class="rav g"><svg viewBox="0 0 20 20" class="rob"><rect x="4" y="6" width="12" height="9" rx="2"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="12.5" cy="10" r="1.5"/><rect x="8" y="12" width="4" height="1.5" rx=".5"/><rect x="9" y="3" width="2" height="3" rx="1"/></svg></div><div class="cn">Public data exploration</div><div class="cd">Crawl news, tech blogs, filings to surface buying intent signals.</div><div class="cf"><span class="ctg">Category</span><button class="cbtn">Chat & configure →</button></div></div></div>
     </div>
+
+    <!-- Web Intelligence section -->
+    <div class="cs" style="margin-top:24px">
+      <div class="ch"><span>🌐</span><span class="ct">Web Intelligence</span></div>
+      <div class="ag" style="grid-template-columns:repeat(2,1fr)">
+        <div class="ac" onclick="openWebTool('scrape')">
+          <div class="rav" style="background:linear-gradient(135deg,#0ea5e9,#38bdf8)">
+            <svg viewBox="0 0 20 20" class="rob"><path d="M3 5h14M3 10h14M3 15h8" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="16" cy="15" r="3" fill="#fff" opacity=".9"/><path d="M15 15h2M16 14v2" stroke="#0ea5e9" stroke-width="1" stroke-linecap="round"/></svg>
+          </div>
+          <div class="cn">Scrape Website</div>
+          <div class="cd">Extract clean content from any URL — text, metadata, and structure. Powered by Firecrawl.</div>
+          <div class="cf"><span class="ctg">Web Tools</span><button class="cbtn">Open tool →</button></div>
+        </div>
+        <div class="ac" onclick="openWebTool('github')">
+          <div class="rav" style="background:linear-gradient(135deg,#1e293b,#475569)">
+            <svg viewBox="0 0 20 20" class="rob"><path fill="#fff" d="M10 2C5.58 2 2 5.58 2 10c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0018 10c0-4.42-3.58-8-8-8z"/></svg>
+          </div>
+          <div class="cn">Find GitHub</div>
+          <div class="cd">Detect GitHub presence on any company website — surface repos, orgs, and open-source activity.</div>
+          <div class="cf"><span class="ctg">Web Tools</span><button class="cbtn">Open tool →</button></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </main>
 
@@ -335,6 +411,53 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
 </div>
 </div>
 
+<!-- ═══ WEB TOOLS FULLSCREEN ═══ -->
+<div class="wt-panel" id="wtPanel">
+  <div style="display:flex;flex-direction:column;height:100vh;overflow:hidden">
+    <div class="wt-top">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="afs-bk" onclick="closeWebTool()"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12"><path d="M10 3L5 8l5 5"/></svg>Agents</button>
+        <div style="width:1px;height:18px;background:var(--border)"></div>
+        <div class="afs-lbl">
+          <div class="rav" id="wtIco" style="width:26px;height:26px;background:linear-gradient(135deg,#0ea5e9,#38bdf8)"><svg viewBox="0 0 20 20" class="rob" style="width:14px;height:14px"><path d="M3 5h14M3 10h14M3 15h8" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></div>
+          <span class="afs-n" id="wtTitle">Web Tools</span>
+          <span class="wt-badge">Firecrawl</span>
+        </div>
+      </div>
+      <button class="afs-done" onclick="closeWebTool()">Done</button>
+    </div>
+    <div class="wt-body">
+      <div class="wt-left">
+        <div class="wt-form">
+          <div class="wt-form-lbl">Enter URL</div>
+          <div class="wt-url-w">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12" style="flex-shrink:0;color:var(--tm)"><circle cx="6" cy="6" r="4"/><path d="M10 10l3 3"/></svg>
+            <input class="wt-url" id="wtUrl" placeholder="https://example.com" type="url" onkeydown="if(event.key==='Enter')wtRun()"/>
+          </div>
+          <div class="wt-modes">
+            <div class="wt-mode active" id="wm-scrape" onclick="setWtMode('scrape')">📄 Scrape</div>
+            <div class="wt-mode" id="wm-github" onclick="setWtMode('github')">⬡ GitHub</div>
+            <div class="wt-mode" id="wm-map" onclick="setWtMode('map')">🗺 Map</div>
+          </div>
+          <button class="wt-go" id="wtGoBtn" onclick="wtRun()">Run →</button>
+        </div>
+        <div class="wt-log" id="wtLog">Ready.</div>
+        <div class="wt-hist">
+          <div class="wt-hl">Recent</div>
+          <div id="wtHistList"><div style="font-size:11px;color:var(--tm)">No recent runs.</div></div>
+        </div>
+      </div>
+      <div class="wt-right">
+        <div class="wt-empty" id="wtEmpty">
+          <svg viewBox="0 0 40 40" fill="none" width="40" height="40" style="opacity:.2"><circle cx="20" cy="20" r="18" stroke="currentColor" stroke-width="2"/><path d="M8 20h24M20 8c-4 4-6 8-6 12s2 8 6 12M20 8c4 4 6 8 6 12s-2 8-6 12" stroke="currentColor" stroke-width="1.5"/></svg>
+          <p>Enter a URL and choose a mode.<br/>Results appear here.</p>
+        </div>
+        <div class="wt-res" id="wtRes"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 const HIST=[
   {id:1,q:'B2B SaaS companies writing about customer churn, retention, or time-to-value problems',dt:'2026-04-11T09:15:00',cos:14,sigs:16,ico:'😰'},
@@ -378,7 +501,7 @@ function loadH(id){const h=HIST.find(x=>x.id===id);if(h){togHist();runQ(h.q)}}
 function openAgent(){resetA();document.getElementById('afs').classList.add('open');setTimeout(()=>document.getElementById('inp').focus(),80)}
 function closeAgent(){document.getElementById('afs').classList.remove('open')}
 function sps(n,b){ps=n;document.querySelectorAll('.pg-p').forEach(x=>x.classList.toggle('active',x===b));renT(aR)}
-function resetA(){run=false;fD=[];aR=[];ps=10;exG=new Set();const m=document.getElementById('msgs');[...m.children].forEach(c=>{if(c.id!=='intro')c.remove()});document.getElementById('suggs').style.display='';document.getElementById('empty').style.display='flex';document.getElementById('pip').style.display='none';document.getElementById('resH').style.display='none';document.getElementById('tsc').style.display='none';document.getElementById('san').style.display='none';document.getElementById('dlBtn').disabled=true;document.getElementById('elap').style.display='none';document.getElementById('inp').value='';document.getElementById('tb').innerHTML='';['query','search','scrape','extract','score'].forEach(rPh);renS()}
+function resetA(){run=false;fD=[];aR=[];ps=10;exG=new Set();_layout='default';const m=document.getElementById('msgs');[...m.children].forEach(c=>{if(c.id!=='intro')c.remove()});document.getElementById('suggs').style.display='';document.getElementById('empty').style.display='flex';document.getElementById('pip').style.display='none';document.getElementById('resH').style.display='none';document.getElementById('tsc').style.display='none';document.getElementById('san').style.display='none';document.getElementById('dlBtn').disabled=true;document.getElementById('elap').style.display='none';document.getElementById('inp').value='';document.getElementById('tb').innerHTML='';['query','search','scrape','extract','score'].forEach(rPh);renS()}
 function renS(){const l=document.getElementById('suggL');l.innerHTML='';SUGGS.forEach(s=>{const e=document.createElement('div');e.className='fsg-i';e.onclick=()=>{e.classList.add('used');runQ(s.t)};const p=s.t.length>130?s.t.slice(0,127)+'…':s.t;e.innerHTML=`<div class="fsg-arr">→</div><div style="min-width:0"><div class="fsg-txt">${esc(p)}</div><div class="fsg-tag">${esc(s.tag)}</div></div>`;l.appendChild(e)})}
 function addU(t){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fm fm-u';d.innerHTML=`<div class="fb fb-u">${esc(t)}</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
 function addA(h){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fm fm-a';d.innerHTML=`<div class="fav"><svg viewBox="0 0 20 20" class="rob" style="width:14px;height:14px"><rect x="4" y="6" width="12" height="9" rx="2"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="12.5" cy="10" r="1.5"/><rect x="8" y="12" width="4" height="1.5" rx=".5"/><rect x="9" y="3" width="2" height="3" rx="1"/></svg></div><div class="fb fb-a">${h}</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
@@ -458,8 +581,9 @@ async function runQ(q){
             const e=document.getElementById('th');if(e)e.remove();
             ['query','search','scrape','extract','score'].forEach(p=>sPh(p,'done'));
             sLg(`Complete — ${data.total_companies||0} companies`);
-            
-            // Format the list of evidence items before rendering to match MOCK expectations
+
+            // Detect layout from question and apply dynamic columns
+            _layout = detectLayout(data.question || q);
             renRes(data);
             
             // Render Answer synthesis from Claude
@@ -499,6 +623,29 @@ function nxS(r){const t=((r.title||'')+' '+(r.ke||'')).toLowerCase();const rules
 function grpR(r){const g=new Map();r.forEach(x=>{const k=x.cd||domOf(x.url);if(!g.has(k))g.set(k,[]);g.get(k).push(x)});const ts=d=>d?(new Date(d).getTime()||0):0;const s=[...g.entries()].map(([k,v])=>[k,v.sort((a,b)=>(ts(b.date)-ts(a.date))||(b.conf-a.conf))]);s.sort((a,b)=>(ts(b[1][0].date)-ts(a[1][0].date))||(b[1][0].conf-a[1][0].conf));return s}
 function togG(d){if(exG.has(d))exG.delete(d);else exG.add(d);renT(aR)}
 
+// ── Dynamic layout detection ──────────────────────────────────────────────────
+let _layout = 'default'; // 'default' | 'github' | 'linkedin' | 'scrape'
+
+function detectLayout(question) {
+  const q = (question||'').toLowerCase();
+  if (/github|open.?source|repo|git\s*hub/.test(q)) return 'github';
+  if (/linkedin|li\s+post|linkedin\s+post/.test(q)) return 'linkedin';
+  if (/scrape|extract.*content|page.*content|web.*content/.test(q)) return 'scrape';
+  return 'default';
+}
+
+function setTableHeaders(layout) {
+  const thead = document.querySelector('#tsc thead tr');
+  if (!thead) return;
+  const cols = {
+    default: ['<th></th><th>Company</th><th>Domain</th><th>Type</th><th>Signal</th><th>Score</th><th>Date</th><th>Source</th><th>Next step</th>'],
+    github:  ['<th></th><th>Company</th><th>Domain</th><th>GitHub Present</th><th>GitHub URL</th>'],
+    linkedin:['<th></th><th>Company</th><th>Post excerpt</th><th>Date</th><th>Link</th>'],
+    scrape:  ['<th></th><th>Company</th><th>Source</th><th>Extracted content</th><th>Score</th><th>Date</th>'],
+  };
+  thead.innerHTML = (cols[layout] || cols.default)[0];
+}
+
 function evC(r,sub){
   const sc=r.conf,scC=sc>=.7?'sc-hi':sc>=.45?'sc-md':'sc-lo';
   const ct=(r.ct||'').toLowerCase(),ctC=ct.includes('blog')?'ct-blog':ct.includes('ann')?'ct-ann':ct.includes('case')?'ct-cs':(ct.includes('guide')||ct.includes('play'))?'ct-guide':'ct-other',ctL=ct?ct.replace(' post',''):'article';
@@ -507,18 +654,68 @@ function evC(r,sub){
   const sd=sub?`<td style="padding-left:8px;border-left:2px solid var(--border)"><span style="font-family:var(--mono);font-size:9px;color:var(--tm)">${esc(ns)}</span></td>`:`<td><div class="co-w"><img src="https://www.google.com/s2/favicons?domain=${ns}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-f"/><div class="co-n" style="color:var(--ts);font-size:10.5px">${esc(ns)}</div></div></td>`;
   return`${sd}<td><span class="ct-b ${ctC}">${esc(ctL)}</span></td><td><div class="sig-t">${esc(ex)}</div></td><td><span class="sc-p ${scC}">${Math.round(sc*100)}%</span></td><td>${dc}</td><td><span class="pu" title="${esc(u)}">${esc(ud)}${ud.length>=34?'…':''}</span></td><td><span class="ns-p ${n.c}">${n.i} ${esc(n.a)}</span></td>`}
 
+function evRow_github(d, cr) {
+  // GitHub layout: Company | Domain | GitHub Present (auto-check) | GitHub URL
+  const b=cr[0], cn=b.cn||d.split('.')[0];
+  const safeId = d.replace(/\./g,'-');
+  return `<td><div class="co-w"><img src="https://www.google.com/s2/favicons?domain=${esc(d)}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-f"/><div class="co-n">${esc(cn)}</div></div></td>
+    <td><a href="https://${esc(d)}" target="_blank" style="font-family:var(--mono);font-size:10px;color:var(--pri);text-decoration:none">${esc(d)}</a></td>
+    <td id="gh-m-${safeId}"><span style="font-family:var(--mono);font-size:9px;color:var(--tm)">checking…</span></td>
+    <td id="ghl-${safeId}"><span style="font-family:var(--mono);font-size:9px;color:var(--tm)">—</span></td>`;
+}
+function evRow_linkedin(d, cr) {
+  // LinkedIn layout: Company | Post excerpt | Date | Link
+  const b=cr[0], cn=b.cn||d.split('.')[0];
+  const ke=(b.ke||b.title||'').slice(0,220);
+  const{dt,rc,rl}=b.di;
+  const u=b.url||'', ud=u.replace(/^https?:\/\/(www\.)?/,'').slice(0,40);
+  return `<td><div class="co-w"><img src="https://www.google.com/s2/favicons?domain=${esc(d)}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-f"/><div class="co-n">${esc(cn)}</div></div></td>
+    <td style="max-width:360px"><div style="font-size:11.5px;color:var(--text);line-height:1.6">${esc(ke)}${ke.length>=220?'…':''}</div></td>
+    <td><div class="dt-m">${esc(dt)}</div><span class="dt-r ${rc}">${esc(rl)}</span></td>
+    <td><a href="${esc(u)}" target="_blank" class="pu" style="text-decoration:none">${esc(ud)}…</a></td>`;
+}
+function evRow_scrape(d, cr) {
+  // Scrape layout: Company | Source | Content | Score | Date
+  const b=cr[0], cn=b.cn||d.split('.')[0];
+  const ke=(b.ke||b.title||'').slice(0,260);
+  const sc=b.conf, scC=sc>=.7?'sc-hi':sc>=.45?'sc-md':'sc-lo';
+  const{dt,rc,rl}=b.di;
+  const ns=b.nsd||domOf(b.url||'');
+  return `<td><div class="co-w"><img src="https://www.google.com/s2/favicons?domain=${esc(d)}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-f"/><div class="co-n">${esc(cn)}</div></div></td>
+    <td><span style="font-family:var(--mono);font-size:9px;color:var(--tm)">${esc(ns)}</span></td>
+    <td style="max-width:380px"><div style="font-size:11.5px;color:var(--ts);line-height:1.6">${esc(ke)}${ke.length>=260?'…':''}</div></td>
+    <td><span class="sc-p ${scC}">${Math.round(sc*100)}%</span></td>
+    <td><div class="dt-m">${esc(dt)}</div><span class="dt-r ${rc}">${esc(rl)}</span></td>`;
+}
+
 function renT(rows){
   const tb=document.getElementById('tb');tb.innerHTML='';
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--tm)">No results found.</td></tr>`;document.getElementById('tsc').style.display='block';return}
+  setTableHeaders(_layout);
+  const colspan = _layout==='github'?4:_layout==='linkedin'?4:_layout==='scrape'?5:9;
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="${colspan}" style="text-align:center;padding:32px;color:var(--tm)">No results found.</td></tr>`;document.getElementById('tsc').style.display='block';return}
   const ag=grpR(rows),dg=ps===0?ag:ag.slice(0,ps);
   document.getElementById('pgB').style.display='flex';document.getElementById('pgS').textContent=ag.length>dg.length?`${dg.length} of ${ag.length} companies`:`All ${ag.length} companies`;
+  const ghDomains = [];
   dg.forEach(([d,cr])=>{const b=cr[0],hm=cr.length>1,ie=exG.has(d),cn=b.cn||d.split('.')[0];
-    const tr=document.createElement('tr');tr.style.cssText='cursor:pointer;background:var(--white)';tr.onmouseover=()=>tr.style.background='var(--prl)';tr.onmouseout=()=>tr.style.background='var(--white)';if(hm)tr.onclick=()=>togG(d);
-    const eb=hm?`<span style="font-family:var(--mono);font-size:9px;color:var(--pri);margin-left:5px">${ie?'▾':'▸'}${cr.length}</span>`:'';
-    tr.innerHTML=`<td><div class="co-w"><img src="https://www.google.com/s2/favicons?domain=${d}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-f"/><div class="co-n">${esc(cn)}${eb}</div></div></td><td><span style="font-family:var(--mono);font-size:10px;color:var(--pri)">${esc(d)}</span></td>${evC(b,false)}`;
+    const tr=document.createElement('tr');tr.style.cssText='cursor:pointer;background:var(--white)';tr.onmouseover=()=>tr.style.background='var(--prl)';tr.onmouseout=()=>tr.style.background='var(--white)';
+    const eb=hm&&_layout==='default'?`<span style="font-family:var(--mono);font-size:9px;color:var(--pri);margin-left:5px">${ie?'▾':'▸'}${cr.length}</span>`:'';
+    if(_layout==='github') {
+      tr.innerHTML=`<td style="width:20px"><input type="checkbox" style="width:14px;height:14px;accent-color:var(--pri);cursor:pointer"/></td>${evRow_github(d,cr)}`;
+      ghDomains.push(d);
+    } else if(_layout==='linkedin') {
+      tr.innerHTML=`<td style="width:20px"></td>${evRow_linkedin(d,cr)}`;
+    } else if(_layout==='scrape') {
+      tr.innerHTML=`<td style="width:20px"></td>${evRow_scrape(d,cr)}`;
+    } else {
+      if(hm) tr.onclick=()=>togG(d);
+      tr.innerHTML=`<td style="width:20px"><input type="checkbox" onclick="event.stopPropagation()"/></td><td><div class="co-w"><img src="https://www.google.com/s2/favicons?domain=${d}&sz=32" onerror="this.style.display='none'" loading="lazy" class="co-f"/><div class="co-n">${esc(cn)}${eb}</div></div></td><td><a href="https://${esc(d)}" target="_blank" onclick="event.stopPropagation()" style="font-family:var(--mono);font-size:10px;color:var(--pri);text-decoration:none;border-bottom:1px dashed var(--prb);display:inline-block">${esc(d)}</a></td>${evC(b,false)}`;
+      if(ie&&hm)cr.slice(1).forEach(r=>{const ts=document.createElement('tr');ts.style.cssText='background:var(--bg)';ts.innerHTML=`<td></td><td></td><td></td>${evC(r,true)}`;tb.appendChild(ts)});
+    }
     tb.appendChild(tr);
-    if(ie&&hm)cr.slice(1).forEach(r=>{const ts=document.createElement('tr');ts.style.cssText='background:var(--bg)';ts.innerHTML=`<td></td><td></td>${evC(r,true)}`;tb.appendChild(ts)});
-  });document.getElementById('tsc').style.display='block'}
+  });
+  // Auto-check GitHub for github layout
+  if(_layout==='github' && ghDomains.length) checkGithubDomains(ghDomains);
+  document.getElementById('tsc').style.display='block'}
 
 function renRes(data){aR=[];fD=[];for(const co of(data.companies||[]))for(const ev of(co.evidence||[])){const r=bRow(co,ev);aR.push(r);fD.push(r)}document.getElementById('resH').style.display='flex';renT(aR);const s=document.getElementById('san'),hi=aR.filter(r=>r.conf>=.7).length,md=aR.filter(r=>r.conf>=.45&&r.conf<.7).length,lo=aR.filter(r=>r.conf<.45).length;s.style.display='flex';s.innerHTML=`<div style="display:flex;align-items:center;gap:5px"><span class="sd sd-ok"></span>${hi} strong</div><div style="display:flex;align-items:center;gap:5px"><span class="sd sd-md"></span>${md} moderate</div>${lo?`<div style="display:flex;align-items:center;gap:5px"><span class="sd sd-lo"></span>${lo} weak</div>`:''}`;document.getElementById('dlBtn').disabled=false;document.getElementById('resCnt').textContent=`${grpR(aR).length} companies · ${aR.length} signals`}
 
@@ -526,8 +723,163 @@ function dl(){if(!fD.length)return;const h=['Company','Domain','Title','Type','S
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function domOf(u){const m=(u||'').match(/https?:\/\/(?:www\.)?([^/]+)/);return m?m[1].toLowerCase():''}
 
+// ── GitHub presence checker (used for github layout) ─────────────────────────
+async function checkGithubDomains(domains) {
+  try {
+    const resp = await fetch('/api/check-github', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({domains}),
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    for (const r of (data.results || [])) {
+      const safeId = (r.domain || '').replace(/\./g, '-');
+      const mCell = document.getElementById(`gh-m-${safeId}`);
+      const lCell = document.getElementById(`ghl-${safeId}`);
+      if (mCell) {
+        if (r.has_github) {
+          const ghUrl = r.github_url || 'https://github.com';
+          mCell.innerHTML = `<a href="${esc(ghUrl)}" target="_blank" style="text-decoration:none;font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:4px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;display:inline-flex;align-items:center;gap:3px;"><svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>Yes</a>`;
+          if (lCell) lCell.innerHTML = `<a href="${esc(r.github_url||'')}" target="_blank" style="font-family:var(--mono);font-size:9px;color:var(--pri);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;max-width:200px">${esc((r.github_url||'').replace('https://',''))}</a>`;
+        } else {
+          mCell.innerHTML = `<span style="font-family:var(--mono);font-size:9px;color:var(--tm)">No</span>`;
+          if (lCell) lCell.innerHTML = `<span style="font-family:var(--mono);font-size:9px;color:var(--tm)">—</span>`;
+        }
+      }
+    }
+  } catch(e) { console.warn('GitHub check failed:', e); }
+}
+
 renS();renH();
 setTimeout(()=>{openAgent();setTimeout(()=>runQ(HIST[0].q),200)},400);
+
+// ── Web Tools ─────────────────────────────────────────────────────────────────
+let _wtMode = 'scrape';
+let _wtRunning = false;
+let _wtHist = [];
+
+function openWebTool(mode) {
+  setWtMode(mode || 'scrape');
+  document.getElementById('wtPanel').classList.add('open');
+  setTimeout(() => document.getElementById('wtUrl').focus(), 80);
+}
+function closeWebTool() {
+  document.getElementById('wtPanel').classList.remove('open');
+}
+function setWtMode(m) {
+  _wtMode = m;
+  ['scrape','github','map'].forEach(x => {
+    document.getElementById('wm-'+x).classList.toggle('active', x === m);
+  });
+  const labels = {scrape:'Scrape Website', github:'Find GitHub', map:'Site Map'};
+  document.getElementById('wtTitle').textContent = labels[m] || 'Web Tools';
+}
+function wtSetLog(msg) { document.getElementById('wtLog').textContent = msg; }
+function wtShowRes() {
+  document.getElementById('wtEmpty').style.display = 'none';
+  document.getElementById('wtRes').style.display = 'block';
+}
+async function wtRun() {
+  const url = document.getElementById('wtUrl').value.trim();
+  if (!url || _wtRunning) return;
+  const fullUrl = /^https?:\/\//i.test(url) ? url : 'https://' + url;
+  _wtRunning = true;
+  document.getElementById('wtGoBtn').disabled = true;
+  wtSetLog('Connecting…');
+  const res = document.getElementById('wtRes');
+  res.innerHTML = '';
+  wtShowRes();
+  try {
+    const resp = await fetch('/api/web-tools', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url: fullUrl, mode: _wtMode}),
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {stream: true});
+      const chunks = buf.split('\n\n'); buf = chunks.pop();
+      for (const chunk of chunks) {
+        let event = 'message', dataStr = '';
+        for (const line of chunk.split('\n')) {
+          if (line.startsWith('event: ')) event = line.slice(7).trim();
+          else if (line.startsWith('data: ')) dataStr = line.slice(6).trim();
+        }
+        if (!dataStr) continue;
+        const data = JSON.parse(dataStr);
+        if (event === 'progress') wtSetLog(data.msg || '…');
+        else if (event === 'error') wtSetLog('Error: ' + data.msg);
+        else if (event === 'done') { wtSetLog('Done.'); wtRenderResult(data, fullUrl); wtAddHist(fullUrl, _wtMode, data); }
+      }
+    }
+  } catch(e) {
+    wtSetLog('Error: ' + e.message);
+    res.innerHTML = `<div class="wt-card"><div style="color:var(--red);font-size:12px">⚠ ${esc(e.message)}</div></div>`;
+  }
+  _wtRunning = false;
+  document.getElementById('wtGoBtn').disabled = false;
+}
+function wtRenderResult(data, url) {
+  const res = document.getElementById('wtRes');
+  if (data.mode === 'scrape') {
+    const charCount = data.full_length || (data.content||'').length;
+    const capped = charCount > 3000;
+    res.innerHTML = `<div class="wt-card">
+      <div class="wt-card-hdr"><div class="wt-card-ico"><svg viewBox="0 0 20 20" class="rob"><path d="M4 5h12M4 9h12M4 13h8" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></div>
+        <div style="flex:1;min-width:0"><div class="wt-card-ti">${esc(data.title||url)}</div>${data.description?`<div class="wt-card-su">${esc(data.description)}</div>`:''}</div></div>
+      <div class="wt-meta"><span class="wt-chip">${esc(url.replace(/^https?:\/\/(www\.)?/,'').split('/')[0])}</span>${charCount?`<span class="wt-chip grn">${charCount.toLocaleString()} chars</span>`:''}${data.link_count?`<span class="wt-chip amb">${data.link_count} links</span>`:''}${capped?`<span class="wt-chip" style="background:var(--redl);color:var(--red);border-color:#fca5a5">preview</span>`:''}</div>
+      <div class="wt-content-lbl">Extracted content${capped?' (first 3 000 chars)':''}</div>
+      <div class="wt-content-box">${esc(data.content||'(no content extracted)')}</div></div>`;
+  } else if (data.mode === 'github') {
+    const links = data.github_links || [];
+    const found = links.length > 0;
+    const badge = found
+      ? `<span style="background:var(--grl);color:var(--grn);border:1px solid var(--grb);font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:4px;font-weight:600">✓ ${links.length} link${links.length!==1?'s':''} found</span>`
+      : `<span style="background:var(--redl);color:var(--red);border:1px solid #fca5a5;font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:4px">No GitHub found</span>`;
+    const rows = links.map(l=>`<div class="wt-gh-item"><span class="wt-gh-kind">${esc(l.kind)}</span><span class="wt-gh-url" onclick="window.open('${esc(l.url)}','_blank')">${esc(l.url)}</span><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" width="10" height="10" style="flex-shrink:0;opacity:.4"><path d="M2 10L10 2M6 2h4v4"/></svg></div>`).join('');
+    res.innerHTML = `<div class="wt-card">
+      <div class="wt-card-hdr"><div class="wt-card-ico" style="background:linear-gradient(135deg,#1e293b,#475569)"><svg viewBox="0 0 20 20" class="rob"><path fill="#fff" d="M10 2C5.58 2 2 5.58 2 10c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0018 10c0-4.42-3.58-8-8-8z"/></svg></div>
+        <div><div class="wt-card-ti">${esc(data.page_title||url)}</div><div style="margin-top:5px">${badge}</div></div></div>
+      ${found?`<div class="wt-content-lbl">GitHub links detected</div>${rows}`:`<div style="font-size:11.5px;color:var(--ts);line-height:1.7">No GitHub links found. Try /about or /team pages.</div>`}
+    </div>`;
+  } else if (data.mode === 'map') {
+    const groups = data.groups || {};
+    const keys = Object.keys(groups).sort((a,b)=>groups[b].length-groups[a].length);
+    const grpHtml = keys.map(k=>{const lks=groups[k].slice(0,20);return`<div class="wt-map-group"><div class="wt-map-gn">/${esc(k)} <span class="wt-map-cnt">${groups[k].length}</span></div>${lks.map(l=>`<a class="wt-map-link" href="${esc(l)}" target="_blank">${esc(l.replace(/^https?:\/\/(www\.)?/,''))}</a>`).join('')}${groups[k].length>20?`<div style="font-family:var(--mono);font-size:9px;color:var(--tm);margin-top:4px">+${groups[k].length-20} more…</div>`:''}</div>`;}).join('');
+    res.innerHTML = `<div class="wt-card">
+      <div class="wt-card-hdr"><div class="wt-card-ico" style="background:linear-gradient(135deg,#7c3aed,#a78bfa)"><svg viewBox="0 0 20 20" class="rob"><path d="M3 10h14M10 3v14" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></div>
+        <div><div class="wt-card-ti">Site map — ${data.total||0} URLs</div><div class="wt-card-su">${esc(url)}</div></div></div>
+      <div class="wt-meta"><span class="wt-chip grn">${data.total||0} pages</span><span class="wt-chip">${keys.length} sections</span></div>
+      <div class="wt-content-lbl">URL structure</div>
+      ${grpHtml||'<div style="font-size:11.5px;color:var(--ts)">No URLs returned.</div>'}
+    </div>`;
+  }
+}
+function wtAddHist(url, mode, data) {
+  _wtHist.unshift({url, mode, data, ts: Date.now()});
+  if (_wtHist.length > 10) _wtHist.pop();
+  wtRenderHist();
+}
+function wtRenderHist() {
+  const el = document.getElementById('wtHistList');
+  if (!_wtHist.length) { el.innerHTML = '<div style="font-size:11px;color:var(--tm)">No recent runs.</div>'; return; }
+  el.innerHTML = _wtHist.map((h,i)=>{
+    const short = h.url.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,'');
+    const m = {scrape:'📄',github:'⬡',map:'🗺'}[h.mode]||'🌐';
+    return `<div class="wt-hi" onclick="wtReload(${i})"><div class="wt-hi-url">${m} ${esc(short)}</div><div class="wt-hi-m">${h.mode} · ${Math.floor((Date.now()-h.ts)/60000)||'<1'}m ago</div></div>`;
+  }).join('');
+}
+function wtReload(i) {
+  const h=_wtHist[i]; if(!h)return;
+  document.getElementById('wtUrl').value=h.url;
+  setWtMode(h.mode); wtShowRes();
+  document.getElementById('wtRes').innerHTML='';
+  wtRenderResult(h.data,h.url); wtSetLog('Loaded from history.');
+}
 </script>
 </body>
 </html>
