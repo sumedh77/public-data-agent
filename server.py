@@ -1745,65 +1745,45 @@ async def synthesize_answer(
             "signals":  ev_list,
         })
 
-    prompt = f"""You are a senior GTM intelligence analyst producing a briefing for a {persona}.
-Their goal: {use_case}
+    prompt = f"""You are a senior GTM intelligence analyst writing for a {persona}.
+Goal: {use_case}
 Signal focus: {signal_focus}
 
-RESEARCH QUERY: "{question}"
+QUERY: "{question}"
 
-RAW EVIDENCE ({len(companies_data)} companies):
+EVIDENCE ({len(companies_data)} companies):
 {json.dumps(companies_data, indent=2)}
 
 ---
 
-YOUR TASK: Write a rich, tiered intelligence report in markdown. Model your output on this exact structure:
+Write a concise intelligence briefing in markdown. STRICT LIMIT: under 200 words total.
 
-## [1-line summary of the key finding pattern across all results]
+Format:
+**[1-line pattern summary]**
 
----
+**Top signals:**
+- **Company** — Person, Title: what they did + why it matters. [Source](proof_url) · Signal: type · Hook: outreach angle
+- repeat for top 3-5 entries only (highest confidence, named person preferred)
 
-## Tier 1: Highest-signal entries (named person + company + specific action + date)
-For each entry in Tier 1:
-**N. [Company Name] — [Specific action] ([Date if known])**
-[2-3 sentences with the specific detail: person name & title if available, exact action taken, any dollar amounts / tool names / team sizes / percentages mentioned. Quote briefly if the signal text contains a first-person statement.]
-
-**Signal type:** [e.g., Vendor replacement / Framework migration / New hire / Funding / Product launch]
-**Outreach angle:** [1 crisp sentence — the specific conversation to open, e.g., "They just replaced X with Y — lead with multi-vendor abstraction story."]
-
----
-
-## Tier 2: Team-level patterns (documented migrations/decisions without named individuals)
-Same format but shorter — 2-3 entries showing pattern-level signals.
-
----
-
-## Tier 3: Structural signals (company-level signals, no specific person named)
-List remaining companies in a tight 1-sentence-each format: Company — what they did — why it matters.
-
----
-
-## How to prioritize outreach
-[3-4 bullet points ranking the Tier 1 companies by urgency and suggesting the hook for each]
-
----
+**Pattern:** [1 sentence on the broader trend across all results]
 
 RULES:
-- Every Tier 1 entry MUST include a Proof URL from the evidence (format: [Source](url))
-- If a signal field ends with "Proof: [url]" — extract and use that URL as the clickable source link
-- Never repeat a company across tiers
-- If evidence is thin for a company, put it in Tier 3 — do not inflate weak signals to Tier 1
-- Do not add companies that aren't in the evidence
-- Use professional but punchy language — this is a live sales intelligence report, not an academic paper
-- Return ONLY the markdown report. No preamble, no sign-off."""
+- Under 200 words — no exceptions
+- Only include companies from the evidence
+- Each bullet = 1 line max
+- Always include the proof URL as a clickable markdown link
+- If signal ends with "Proof: [url]" use that URL
+- No headers beyond the ones shown, no Tier sections, no "How to prioritize" section
+- Return ONLY the briefing. No preamble."""
 
     try:
         answer, cost = await _anthropic_call_with_fallback(
             client,
             system=(
                 "You are an elite B2B GTM intelligence analyst. "
-                "Write structured markdown reports with Signal Type and Outreach Angle for every named entry. "
-                "Be specific: name the person, the tool, the dollar amount, the date. "
-                "Never write vague summaries. Every sentence must be actionable."
+                "Write concise intelligence briefings strictly under 200 words. "
+                "Each bullet: company, person+title, specific action, proof URL, signal type, outreach hook — all on one line. "
+                "Never exceed 200 words. Never write vague summaries."
             ),
             user_content=prompt,
             max_tokens=4000,
