@@ -174,13 +174,32 @@ def log_query_metrics(query: str, tools_used: dict, llm_cost: float,
     except Exception as e:
         print("Failed to log metrics:", e)
 
-# ── Domains to DROP entirely (social media — never contain company signals) ───
+# ── Domains to DROP entirely — genuinely zero signal content ─────────────────
+# linkedin.com intentionally NOT excluded: LinkedIn posts (user testimonials,
+# thought leadership, product mentions) are high-quality B2B signals.
+# Exa indexes them and returns highlights directly — Firecrawl will fail on
+# login-gated URLs but the snippet evidence is already sufficient.
 _MEDIA_DOMAINS = {
-    "linkedin.com", "twitter.com", "x.com",
+    "twitter.com", "x.com",
+    "instagram.com", "tiktok.com", "pinterest.com",
     "hackernews.com", "news.ycombinator.com",
-    # NOTE: medium.com and substack.com intentionally NOT excluded —
-    # many companies publish their engineering/growth blogs there.
+    # NOTE: medium.com, substack.com, linkedin.com intentionally NOT excluded
 }
+
+# ── Platform-specific domain sets for targeted queries ───────────────────────
+_PLATFORM_DOMAINS: dict[str, list[str]] = {
+    "linkedin":  ["linkedin.com"],
+    "reddit":    ["reddit.com"],
+    "github":    ["github.com"],
+    "twitter":   ["twitter.com", "x.com"],
+    "producthunt": ["producthunt.com"],
+    "hackernews": ["news.ycombinator.com"],
+    "medium":    ["medium.com"],
+    "substack":  ["substack.com"],
+}
+
+# ── Domains where Firecrawl will fail (login-gated) — use snippet only ────────
+_SNIPPET_ONLY_DOMAINS = {"linkedin.com", "twitter.com", "x.com", "reddit.com"}
 
 # ── Press-wire / news-wire / aggregator domains ──────────────────────────────
 # Articles from these domains are ABOUT a company, not FROM the company.
@@ -443,15 +462,18 @@ _STARTUP_CONTENT_RE = re.compile(
 def _parse_query_intent(question: str) -> dict:
     """
     Extract from the user's question:
-      - requested_count : int  — explicit number of results (0 = unspecified)
-      - entity_type     : str  — "startup" | "enterprise" | "company"
-      - startup_filter  : bool — True when post-scrape startup signal check is needed
+      - requested_count  : int       — explicit number of results (0 = unspecified)
+      - entity_type      : str       — "startup" | "enterprise" | "company"
+      - startup_filter   : bool      — True when post-scrape startup signal check needed
+      - target_platform  : str|None  — "linkedin" | "reddit" | "github" | etc.
+      - include_domains  : list[str] — domain allowlist to pass to Exa includeDomains
     """
     q_lower = question.lower()
 
-    # Count: "300 companies", "50 startups", "find 100 results"
+    # Count: "300 companies", "50 startups", "10 posts", "find 100 results"
     count_m = re.search(
-        r'\b(\d{1,4})\s*(?:companies|startups?|results?|firms?|organizations?)\b', q_lower
+        r'\b(\d{1,4})\s*(?:companies|startups?|results?|firms?|organizations?|posts?|articles?|examples?)\b',
+        q_lower,
     )
     if not count_m:
         count_m = re.search(r'\bfind\s+(\d{1,4})\b', q_lower)
@@ -461,10 +483,21 @@ def _parse_query_intent(question: str) -> dict:
     is_enterprise = any(sig in q_lower for sig in _ENTERPRISE_SIGNALS)
     entity_type   = "startup" if is_startup else ("enterprise" if is_enterprise else "company")
 
+    # Platform detection — "linkedin posts", "reddit threads", "github issues"
+    target_platform: str | None = None
+    include_domains: list[str]  = []
+    for platform, domains in _PLATFORM_DOMAINS.items():
+        if platform in q_lower:
+            target_platform = platform
+            include_domains = domains
+            break
+
     return {
-        "requested_count": requested_count,
-        "entity_type":     entity_type,
-        "startup_filter":  is_startup,
+        "requested_count":  requested_count,
+        "entity_type":      entity_type,
+        "startup_filter":   is_startup,
+        "target_platform":  target_platform,
+        "include_domains":  include_domains,
     }
 
 def _is_startup_content(content: str) -> bool:
@@ -667,6 +700,7 @@ async def search_exa(
     queries: list[str],
     max_days: int = 180,
     requested_count: int = 0,
+    include_domains: list[str] | None = None,
 ) -> list[dict]:
     """
     Exa deep-reasoning search using additionalQueries to bundle all queries into
@@ -717,14 +751,13 @@ async def search_exa(
             })
         return out
 
-    async def _call(primary_query: str, additional: list[str]) -> list[dict]:
+    async def _call(primary_query: str, additional: list[str], inc_domains: list[str] | None = None) -> list[dict]:
         payload: dict = {
             "query":              primary_query,
             "type":               "deep-reasoning",
             "numResults":         num_results,
             "startPublishedDate": start_date + "T00:00:00.000Z",
             "endPublishedDate":   end_date   + "T23:59:59.999Z",
-            "excludeDomains":     _EXA_EXCLUDE_DOMAINS,
             "contents": {
                 "highlights": {
                     "maxCharacters": 1500,
@@ -732,6 +765,12 @@ async def search_exa(
                 }
             },
         }
+        # Platform-specific: use includeDomains (can't combine with excludeDomains)
+        if inc_domains:
+            payload["includeDomains"] = inc_domains
+        else:
+            payload["excludeDomains"] = _EXA_EXCLUDE_DOMAINS
+
         # additionalQueries bundles all remaining queries into the same call
         if additional:
             payload["additionalQueries"] = additional
@@ -751,11 +790,12 @@ async def search_exa(
 
     # Pass ALL queries in ONE call using additionalQueries
     # This replaces N parallel calls → single request, ~75% cost reduction
-    tasks = [_call(queries[0], queries[1:])]
+    # include_domains (e.g. ["linkedin.com"]) is forwarded to Exa's includeDomains
+    tasks = [_call(queries[0], queries[1:], inc_domains=include_domains or [])]
 
     # Second pass for large counts (> 100 requested)
     if requested_count > EXA_MAX_PER_CALL and len(queries) >= 3:
-        tasks.append(_call(queries[1], queries[2:] + queries[:1]))
+        tasks.append(_call(queries[1], queries[2:] + queries[:1], inc_domains=include_domains or []))
 
     batches = await asyncio.gather(*tasks)
     flat    = [r for b in batches for r in b]
@@ -2012,13 +2052,12 @@ The user asked: "{question}"
 Instructions:
 1. "corrected_query": Fix ANY typos, spelling mistakes, and grammatical errors in the user's question, while preserving their exact intent.
 2. "search_queries": Generate an array of exactly 4 specialized search queries to find this data on Google/Exa.
-   - 1 should be a direct keyword search.
-   - 2 should be semantic queries targeted at finding company signals (e.g. "companies that...").
-   - 1 should be a first-person engineering/company blog query (e.g. "how we...").
+   - PLATFORM RULE: If the user explicitly asks for content from a specific platform (linkedin, reddit, github, twitter, producthunt, etc.), ALL 4 queries MUST be tailored to surface posts/threads from that platform. For LinkedIn, write queries as if someone would post them: first-person testimonial style, mention of the product/topic, personal experience. Example for "linkedin posts about Sumble": ["Sumble sales intelligence linkedin", "using Sumble for prospecting linkedin post", "Sumble GTM tool review linkedin", "Sumble account intelligence user experience"]
+   - If NOT platform-specific: 1 direct keyword, 2 semantic company-signal queries, 1 first-person blog style.
 3. "routing": Decide which data tools are needed to answer this.
-   - "claude_only": Set to TRUE if the question is a FACTUAL KNOWLEDGE question that Claude can answer directly without web search (e.g. "What does Stripe do?", "Does GitHub have an API?", "What is gRPC?", "Who is the CEO of Salesforce?", "What is HubSpot's pricing?", "Explain what Snowflake does", or any general tech concept / well-known company fact). Set FALSE for any query asking to FIND, LIST, DISCOVER, or TRACK companies / signals / articles.
-   - "exa": Web search — use for general news, company blogs, product launches, tech content. Set false if claude_only is true.
-   - "parallel_ai": Deep search — use for technical deep-dives, developer tooling, architecture. Set false if claude_only is true.
+   - "claude_only": Set to TRUE if the question is a FACTUAL KNOWLEDGE question that Claude can answer directly without web search (e.g. "What does Stripe do?", "Does GitHub have an API?", "What is gRPC?", "Who is the CEO of Salesforce?"). Set FALSE for any query asking to FIND, LIST, DISCOVER, or TRACK companies / signals / articles / posts.
+   - "exa": Web search — use for general news, company blogs, product launches, tech content, social posts. Set false if claude_only is true.
+   - "parallel_ai": Deep search — use for technical deep-dives, developer tooling, architecture. Set false if claude_only is true OR if the query is platform-specific (linkedin/reddit/github) — Exa handles those better.
    - "sec_api": SEC EDGAR search — use ONLY for explicit SEC filings (10-K, 8-K), financial earnings, M&A, revenue. Set false if claude_only is true.
 
 Return ONLY a valid JSON object matching this exact structure:
@@ -2097,11 +2136,13 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
     t0 = time.time()
     max_days = _infer_max_days(question)
 
-    # ── Parse query intent (count + entity type) ──────────────────────────────
-    intent          = _parse_query_intent(question)
-    requested_count = intent["requested_count"]
-    entity_type     = intent["entity_type"]
-    startup_filter  = intent["startup_filter"]
+    # ── Parse query intent (count + entity type + platform) ───────────────────
+    intent           = _parse_query_intent(question)
+    requested_count  = intent["requested_count"]
+    entity_type      = intent["entity_type"]
+    startup_filter   = intent["startup_filter"]
+    target_platform  = intent.get("target_platform")
+    include_domains  = intent.get("include_domains", [])
 
     yield sse("start", {"question": question, "msg": "Starting public research pipeline…"})
 
@@ -2179,15 +2220,18 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
             queries = ai_queries
 
         # Surface intent to the frontend
-        if requested_count > 0 or entity_type != "company":
+        if requested_count > 0 or entity_type != "company" or target_platform:
             yield sse("phase", {
-                "phase": "intent",
-                "requested_count": requested_count,
-                "entity_type":     entity_type,
-                "startup_filter":  startup_filter,
+                "phase":            "intent",
+                "requested_count":  requested_count,
+                "entity_type":      entity_type,
+                "startup_filter":   startup_filter,
+                "target_platform":  target_platform,
+                "include_domains":  include_domains,
                 "msg": (
                     f"Intent detected — "
                     + (f"targeting {requested_count} results · " if requested_count else "")
+                    + (f"platform: {target_platform} · " if target_platform else "")
                     + f"entity type: {entity_type}"
                 ),
             })
@@ -2224,9 +2268,10 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
 
         pai_results, exa_results, claude_web_results, sec_results = await asyncio.gather(
             pai_task,
-            search_exa(client, queries, max_days=max_days, requested_count=requested_count) if use_exa else _noop(),
-            search_claude_web(client, queries, max_days=max_days)                            if use_exa else _noop(),
-            search_sec_edgar(client, queries, max_days=max_days)                            if use_sec else _noop(),
+            search_exa(client, queries, max_days=max_days, requested_count=requested_count,
+                       include_domains=include_domains or None)                             if use_exa else _noop(),
+            search_claude_web(client, queries, max_days=max_days)                          if use_exa and not include_domains else _noop(),
+            search_sec_edgar(client, queries, max_days=max_days)                           if use_sec else _noop(),
         )
 
         # Log which source FindAll was used
@@ -2269,7 +2314,8 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
             # Respect routing decisions — don't force-enable providers that were routed off
             round2_pai, round2_exa = await asyncio.gather(
                 search_parallel_ai(client, round2_queries, requested_count=requested_count) if use_pai else _noop(),
-                search_exa(client, round2_queries, max_days=max_days, requested_count=requested_count) if use_exa else _noop(),
+                search_exa(client, round2_queries, max_days=max_days, requested_count=requested_count,
+                           include_domains=include_domains or None)                         if use_exa else _noop(),
             )
             all_results = _merge_dedup([all_results, round2_pai, round2_exa])
 
@@ -2360,10 +2406,20 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
 
         # ── Phase 3b: Firecrawl — scrape top N by snippet confidence ─────────
         # Scale the cap to match the user's requested count (min 40, max 120).
+        # Skip login-gated domains (LinkedIn, Reddit, Twitter) — Exa highlights
+        # are already the full signal; Firecrawl will 403/timeout on these.
         FIRECRAWL_CAP  = min(max(requested_count, 40), 120) if requested_count > 0 else 40
-        urls_to_scrape = [se["url"] for se in snippet_evidence[:FIRECRAWL_CAP]]
+        urls_to_scrape = [
+            se["url"] for se in snippet_evidence[:FIRECRAWL_CAP]
+            if extract_domain_from_url(se["url"]) not in _SNIPPET_ONLY_DOMAINS
+        ]
+        snippet_only_count = sum(
+            1 for se in snippet_evidence[:FIRECRAWL_CAP]
+            if extract_domain_from_url(se["url"]) in _SNIPPET_ONLY_DOMAINS
+        )
         yield sse("phase", {"phase": "scraping", "status": "running",
-                             "msg": f"Deep-scraping top {len(urls_to_scrape)} highest-confidence pages via Firecrawl…"})
+                             "msg": f"Deep-scraping {len(urls_to_scrape)} pages via Firecrawl"
+                                    + (f" · {snippet_only_count} platform posts using snippet directly" if snippet_only_count else "") + "…"})
         scraped, fc_pages, pai_extract_pages = await scrape_urls(client, urls_to_scrape)
         pai_extract_cost = COST_PAI_RESULT * pai_extract_pages  # PAI Extract per-page cost
 
