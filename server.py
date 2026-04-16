@@ -70,8 +70,10 @@ def init_db():
                 conn.execute(f"ALTER TABLE queries ADD COLUMN {col} {typ} DEFAULT 0")
 init_db()
 
-COST_EXA_BASE = 0.005
-COST_EXA_RESULT = 0.0001
+# Exa pricing (docs: deep-reasoning = $15/1000 requests = $0.015 per call;
+#  additional results beyond 10 = $0.001 each; highlights = $0.001 per page)
+COST_EXA_BASE   = 0.015   # deep-reasoning per request
+COST_EXA_RESULT = 0.001   # per result page for highlights
 COST_PAI_BASE = 0.010
 COST_PAI_RESULT = 0.0002
 COST_SEC_BASE = 0.0      # Free — SEC EFTS API
@@ -667,85 +669,93 @@ async def search_exa(
     requested_count: int = 0,
 ) -> list[dict]:
     """
-    Run all queries in parallel via Exa deep-reasoning model with date filtering.
+    Exa deep-reasoning search using additionalQueries to bundle all queries into
+    ONE API call (instead of N parallel calls) — reduces cost by ~75%.
 
-    deep-reasoning uses Exa's highest-quality retrieval model — slower but
-    significantly more precise than deep-lite or auto/neural.
-    Highlights use maxCharacters:1000 — tight, high-signal excerpts.
-    endPublishedDate is always set to today to bound the window cleanly.
+    Per Exa docs (March 2026):
+    - additionalQueries: pass all query variations alongside the main query for
+      more comprehensive coverage in a single request.
+    - deep-reasoning: $0.015 per request (vs $0.005 old estimate)
+    - outputSchema: used ONLY for structured JSON extraction — NOT passed here
+      since we want individual result pages with highlights, not synthesized output.
+    - maxCharacters: 1500 highlights per result for richer signal extraction.
+    - startPublishedDate / endPublishedDate: still the correct date-filter params.
 
-    For large requested_count (> 100): Exa caps at 100 per call, so we run
-    ceil(requested_count / 100) extra sweeps across the top 3 queries.
+    For large requested_count (> 100): run a second pass with queries[:3] to
+    collect additional coverage (Exa caps at 100 per call).
     """
+    if not queries:
+        return []
+
     EXA_MAX_PER_CALL = 100
     today      = datetime.date.today()
     start_date = (today - datetime.timedelta(days=max_days)).isoformat()
     end_date   = today.isoformat()
 
-    # How many results to request per API call
-    if requested_count > EXA_MAX_PER_CALL:
-        num_results = EXA_MAX_PER_CALL
-    elif requested_count > 0:
-        num_results = max(requested_count, 40)
-    else:
-        num_results = 100  # deep-reasoning: always ask for 100, quality filters trim later
+    num_results = min(max(requested_count, 40), EXA_MAX_PER_CALL) if requested_count > 0 else EXA_MAX_PER_CALL
 
-    async def _one(q: str) -> list[dict]:
+    def _parse_results(raw: list[dict]) -> list[dict]:
+        out = []
+        for r in raw:
+            url        = r.get("url", "")
+            title      = r.get("title", "")
+            highlights = r.get("highlights") or []
+            rich_snippet = " … ".join(h for h in highlights if h)[:1000]
+            src_domain = extract_domain_from_url(url)
+            co_name    = extract_company_from_title(title)
+            out.append({
+                "url":                url,
+                "domain":             src_domain,
+                "news_source_domain": src_domain,
+                "title":              title,
+                "date":               (r.get("publishedDate") or "")[:10],
+                "snippet":            rich_snippet,
+                "company_name":       co_name,
+                "company_domain":     _resolve_company_domain(co_name, src_domain),
+                "source":             "exa",
+                "_highlights":        highlights,
+            })
+        return out
+
+    async def _call(primary_query: str, additional: list[str]) -> list[dict]:
+        payload: dict = {
+            "query":              primary_query,
+            "type":               "deep-reasoning",
+            "numResults":         num_results,
+            "startPublishedDate": start_date + "T00:00:00.000Z",
+            "endPublishedDate":   end_date   + "T23:59:59.999Z",
+            "excludeDomains":     _EXA_EXCLUDE_DOMAINS,
+            "contents": {
+                "highlights": {
+                    "maxCharacters": 1500,
+                    "query": primary_query,
+                }
+            },
+        }
+        # additionalQueries bundles all remaining queries into the same call
+        if additional:
+            payload["additionalQueries"] = additional
+
         try:
-            payload: dict = {
-                "query":              q,
-                "type":               "deep-reasoning",
-                "numResults":         num_results,
-                "startPublishedDate": start_date + "T00:00:00.000Z",
-                "endPublishedDate":   end_date   + "T23:59:59.999Z",
-                "excludeDomains":     _EXA_EXCLUDE_DOMAINS,
-                "outputSchema":       {"type": "text"},
-                "contents": {
-                    "highlights": {
-                        "maxCharacters": 1000,
-                    }
-                },
-            }
             resp = await client.post(
                 EXA_URL,
                 headers={"x-api-key": EXA_API_KEY, "Content-Type": "application/json"},
                 json=payload,
-                timeout=60,   # deep-reasoning is slower — allow more time
+                timeout=90,  # deep-reasoning: 10–60s per docs
             )
             resp.raise_for_status()
-            out = []
-            for r in resp.json().get("results", []):
-                url        = r.get("url", "")
-                title      = r.get("title", "")
-                highlights = r.get("highlights") or []
-                rich_snippet = " … ".join(h for h in highlights if h)[:800]
-                src_domain = extract_domain_from_url(url)
-                co_name    = extract_company_from_title(title)
-                out.append({
-                    "url":                url,
-                    "domain":             src_domain,
-                    "news_source_domain": src_domain,
-                    "title":              title,
-                    "date":               r.get("publishedDate", "")[:10],
-                    "snippet":            rich_snippet,
-                    "company_name":       co_name,
-                    "company_domain":     _resolve_company_domain(co_name, src_domain),
-                    "source":             "exa",
-                    "_highlights":        highlights,
-                })
-            return out
+            return _parse_results(resp.json().get("results", []))
         except Exception as e:
-            print(f"Exa deep-reasoning error for query '{q[:60]}': {e}")
+            print(f"Exa deep-reasoning error: {e}")
             return []
 
-    # All queries run in parallel
-    tasks = [_one(q) for q in queries]
+    # Pass ALL queries in ONE call using additionalQueries
+    # This replaces N parallel calls → single request, ~75% cost reduction
+    tasks = [_call(queries[0], queries[1:])]
 
-    # For large counts (> 100): extra sweeps across top 3 sharpest queries
-    if requested_count > EXA_MAX_PER_CALL:
-        extra_batches = math.ceil(requested_count / EXA_MAX_PER_CALL) - 1
-        for _ in range(min(extra_batches, 2)):   # max 3 total sweeps → up to 300
-            tasks.extend([_one(q) for q in queries[:3]])
+    # Second pass for large counts (> 100 requested)
+    if requested_count > EXA_MAX_PER_CALL and len(queries) >= 3:
+        tasks.append(_call(queries[1], queries[2:] + queries[:1]))
 
     batches = await asyncio.gather(*tasks)
     flat    = [r for b in batches for r in b]
@@ -2569,13 +2579,14 @@ async def run_ask_pipeline(question: str) -> AsyncGenerator[str, None]:
 
         
         # Log to DB — Dynamic Per-Provider Costs
-        total_q_exa = (len(queries) if use_exa else 0) + (len(round2_queries) if round2_exa else 0)
+        # Exa: now 1 call (+ 1 for Round 2 if triggered) via additionalQueries
+        total_exa_calls = (1 if use_exa else 0) + (1 if round2_exa else 0)
         total_q_pai = (len(queries) if use_pai else 0) + (len(round2_queries) if round2_pai else 0)
         # SEC now uses _build_sec_queries → always 3 queries max
         total_q_sec = 3 if use_sec else 0
 
-        # Exact cost = Base rate per query + rate per item found
-        exa_cost = (COST_EXA_BASE * total_q_exa) + (COST_EXA_RESULT * len(exa_results))
+        # Exact cost = Base rate per request + rate per result page
+        exa_cost = (COST_EXA_BASE * total_exa_calls) + (COST_EXA_RESULT * len(exa_results))
         pai_cost = (COST_PAI_BASE * total_q_pai) + (COST_PAI_RESULT * len(pai_results))
         sec_cost = (COST_SEC_BASE * total_q_sec) + (COST_SEC_RESULT * len(sec_results))
         fc_cost  = COST_FC_SUCCESS * fc_pages  # only count true Firecrawl successes
