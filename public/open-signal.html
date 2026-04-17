@@ -207,6 +207,36 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
 .sd{width:5px;height:5px;border-radius:50%;flex-shrink:0;display:inline-block}
 .sd-ok{background:var(--grn)}.sd-md{background:#d97706}.sd-lo{background:var(--red)}
 
+/* ═══ CAPABILITY EXPLORER ═══ */
+.fr-empty{display:flex;flex-direction:column;height:100%;overflow:hidden;padding:0;align-items:stretch;justify-content:flex-start;text-align:left;color:var(--text)}
+.cap-hdr{padding:18px 20px 12px;flex-shrink:0;border-bottom:1px solid var(--border);background:var(--white)}
+.cap-h1{font-size:14px;font-weight:700;margin-bottom:3px;display:flex;align-items:center;gap:7px}
+.cap-h2{font-size:10.5px;color:var(--tm);margin-bottom:11px;line-height:1.5}
+.cap-tabs{display:flex;gap:5px;flex-wrap:wrap}
+.cap-tab{font-family:var(--sans);font-size:10px;font-weight:500;padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:var(--white);color:var(--ts);cursor:pointer;transition:all .12s;white-space:nowrap}
+.cap-tab:hover{border-color:var(--prb);color:var(--pri)}
+.cap-tab.active{background:var(--prl);border-color:var(--prb);color:var(--pri);font-weight:600}
+.cap-body{flex:1;overflow-y:auto;padding:14px 18px 8px}
+.cap-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cap-card{border:1.5px solid var(--border);border-radius:var(--r);background:var(--white);overflow:hidden;transition:all .15s;display:flex;flex-direction:column}
+.cap-card:hover{border-color:var(--prb);box-shadow:0 2px 14px rgba(99,102,241,.09);transform:translateY(-1px)}
+.cap-card-hdr{display:flex;align-items:flex-start;gap:9px;padding:11px 13px 8px}
+.cap-ico{font-size:17px;flex-shrink:0;line-height:1.1}
+.cap-name{font-size:11.5px;font-weight:700;margin-bottom:2px;line-height:1.2}
+.cap-desc{font-size:10px;color:var(--ts);line-height:1.45}
+.cap-prompt{border-top:1px solid var(--border);padding:8px 13px;background:var(--bg);display:flex;align-items:flex-start;gap:7px;cursor:pointer;transition:background .12s;flex:1}
+.cap-prompt:hover{background:var(--prl)}
+.cap-prompt-arr{font-size:12px;color:var(--pri);flex-shrink:0;font-weight:700;margin-top:1px}
+.cap-prompt-txt{font-size:10px;color:var(--text);line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-style:italic}
+/* Web Intelligence bar inside agent */
+.cap-web{padding:11px 18px;border-top:1px solid var(--border);background:var(--white);flex-shrink:0}
+.cap-web-row{display:flex;align-items:center;gap:10px}
+.cap-web-lbl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--tm);white-space:nowrap}
+.cap-web-btns{display:flex;gap:6px}
+.cap-wb{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:var(--rs);border:1.5px solid var(--border);background:var(--white);font-family:var(--sans);font-size:10.5px;font-weight:500;color:var(--ts);cursor:pointer;transition:all .12s}
+.cap-wb:hover{border-color:var(--prb);background:var(--prl);color:var(--pri)}
+.cap-wb svg{opacity:.6}
+
 /* ═══ WEB TOOLS FULLSCREEN ═══ */
 .wt-panel{display:none;position:fixed;inset:0;z-index:201;background:var(--bg);flex-direction:column}
 .wt-panel.open{display:flex}
@@ -335,29 +365,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
       <div class="cs"><div class="ch"><span>🔍</span><span class="ct">Open Signal Agent</span></div><div class="ac cust" onclick="openAgent()"><div class="rav g"><svg viewBox="0 0 20 20" class="rob"><rect x="4" y="6" width="12" height="9" rx="2"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="12.5" cy="10" r="1.5"/><rect x="8" y="12" width="4" height="1.5" rx=".5"/><rect x="9" y="3" width="2" height="3" rx="1"/></svg></div><div class="cn">Public data exploration</div><div class="cd">Crawl news, tech blogs, filings to surface buying intent signals.</div><div class="cf"><span class="ctg">Category</span><button class="cbtn">Chat & configure →</button></div></div></div>
     </div>
 
-    <!-- Web Intelligence section -->
-    <div class="cs" style="margin-top:24px">
-      <div class="ch"><span>🌐</span><span class="ct">Web Intelligence</span></div>
-      <div class="ag" style="grid-template-columns:repeat(2,1fr)">
-        <div class="ac" onclick="openWebTool('scrape')">
-          <div class="rav" style="background:linear-gradient(135deg,#0ea5e9,#38bdf8)">
-            <svg viewBox="0 0 20 20" class="rob"><path d="M3 5h14M3 10h14M3 15h8" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="16" cy="15" r="3" fill="#fff" opacity=".9"/><path d="M15 15h2M16 14v2" stroke="#0ea5e9" stroke-width="1" stroke-linecap="round"/></svg>
-          </div>
-          <div class="cn">Scrape Website</div>
-          <div class="cd">Extract clean content from any URL — text, metadata, and structure. Powered by Firecrawl.</div>
-          <div class="cf"><span class="ctg">Web Tools</span><button class="cbtn">Open tool →</button></div>
-        </div>
-        <div class="ac" onclick="openWebTool('github')">
-          <div class="rav" style="background:linear-gradient(135deg,#1e293b,#475569)">
-            <svg viewBox="0 0 20 20" class="rob"><path fill="#fff" d="M10 2C5.58 2 2 5.58 2 10c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0018 10c0-4.42-3.58-8-8-8z"/></svg>
-          </div>
-          <div class="cn">Find GitHub</div>
-          <div class="cd">Detect GitHub presence on any company website — surface repos, orgs, and open-source activity.</div>
-          <div class="cf"><span class="ctg">Web Tools</span><button class="cbtn">Open tool →</button></div>
-        </div>
-      </div>
-    </div>
-
   </div>
 </main>
 
@@ -383,8 +390,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
         <div class="fm fm-a" id="intro">
           <div class="fav"><svg viewBox="0 0 20 20" class="rob" style="width:14px;height:14px"><rect x="4" y="6" width="12" height="9" rx="2"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="12.5" cy="10" r="1.5"/><rect x="8" y="12" width="4" height="1.5" rx=".5"/><rect x="9" y="3" width="2" height="3" rx="1"/></svg></div>
           <div>
-            <div class="fb fb-a"><div class="fan">Open Signal Agent</div><p>Tell me what your prospects are doing — I'll scan their blogs, announcements, and changelogs and surface the exact moment they're ready to buy.</p><p style="margin-top:7px;font-size:11px;color:var(--tm)">Every result includes a confidence score, proof link, and next-step recommendation.</p></div>
-            <div class="fsg" id="suggs"><div class="fsg-l">SDR signal prompts</div><div class="fsg-ls" id="suggL"></div></div>
+            <div class="fb fb-a"><div class="fan">Open Signal Agent</div><p>I scan the public web in real time — blogs, press releases, filings, CVEs, case studies, and changelogs — and surface the exact signals that tell you when a company is ready to buy, switch, or grow.</p><p style="margin-top:7px;font-size:11px;color:var(--tm)">Browse the signal types on the right → click any prompt to run it, or type your own.</p></div>
+            <div class="fsg" id="suggs"><div class="fsg-l">Quick prompts</div><div class="fsg-ls" id="suggL"></div></div>
           </div>
         </div>
       </div>
@@ -392,7 +399,34 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
     </div>
 
     <div class="fr" id="resP">
-      <div class="fr-empty" id="empty"><div style="font-size:32px;opacity:.15">🔍</div><p>Results appear here as the agent runs — with proof links, confidence scores, and next steps.</p></div>
+      <!-- Capability Explorer — shown when no results, hidden when results come in -->
+      <div class="fr-empty" id="empty">
+        <div class="cap-hdr">
+          <div class="cap-h1">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" style="color:var(--pri)"><circle cx="8" cy="8" r="6"/><path d="M8 5v3M8 11h.01"/></svg>
+            What can I research?
+          </div>
+          <div class="cap-h2">Click any prompt to run it — or type your own question below.</div>
+          <div class="cap-tabs" id="capTabs"></div>
+        </div>
+        <div class="cap-body"><div class="cap-grid" id="capGrid"></div></div>
+        <div class="cap-web">
+          <div class="cap-web-row">
+            <span class="cap-web-lbl">Web Intelligence</span>
+            <div class="cap-web-btns">
+              <button class="cap-wb" onclick="openWebTool('scrape')">
+                <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" width="11" height="11"><path d="M2 3h10M2 7h10M2 11h6" stroke-linecap="round"/></svg>Scrape URL
+              </button>
+              <button class="cap-wb" onclick="openWebTool('github')">
+                <svg viewBox="0 0 14 14" fill="currentColor" width="11" height="11"><path d="M7 0C3.13 0 0 3.13 0 7c0 3.09 2 5.71 4.78 6.64.35.06.48-.15.48-.33v-1.3c-1.95.42-2.36-.94-2.36-.94-.32-.81-.78-.03-.78-.03-.64-.44.05-.43.05-.43.7.05.07.72 1.07.72.63 0 1.05-.31 1.28-.57-.15-.12-.17-.87.12-.87-1.56-.18-3.19-.78-3.19-3.46 0-.76.27-1.39.72-1.88-.07-.18-.31-.89.07-1.85 0 0 .59-.19 1.92.72.56-.16 1.16-.23 1.75-.24.59 0 1.19.09 1.75.24 1.33-.9 1.92-.72 1.92-.72.38.96.14 1.67.07 1.85.45.49.71 1.12.71 1.88 0 2.69-1.64 3.28-3.2 3.46.25.22.47.64.47 1.29v1.92c0 .19.13.4.48.33C12 12.71 14 10.09 14 7c0-3.87-3.13-7-7-7z"/></svg>Find GitHub
+              </button>
+              <button class="cap-wb" onclick="openWebTool('map')">
+                <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" width="11" height="11"><path d="M1 3l4-2 4 2 4-2v9l-4 2-4-2-4 2V3z" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 1v9M9 3v9" stroke-linecap="round"/></svg>Map Site
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="fp" id="pip"><div class="fp-ph"><div class="fp-p" id="ph-query"><span class="ph-ico">·</span> Query</div><div class="fp-p" id="ph-search"><span class="ph-ico">·</span> Search</div><div class="fp-p" id="ph-scrape"><span class="ph-ico">·</span> Scrape</div><div class="fp-p" id="ph-extract"><span class="ph-ico">·</span> Extract</div><div class="fp-p" id="ph-score"><span class="ph-ico">·</span> Synthesize</div></div><div class="fp-log" id="lg">Waiting…</div></div>
       <div class="fr-hdr" id="resH">
         <div class="fr-title"><span id="resCnt">Results</span></div>
@@ -466,12 +500,59 @@ const HIST=[
   {id:4,q:'Engineering teams building internal customer dashboards or health score systems',dt:'2026-04-07T16:45:00',cos:12,sigs:15,ico:'🏗️'},
   {id:5,q:'Companies building AI agents for customer onboarding or support deflection',dt:'2026-04-05T10:20:00',cos:6,sigs:8,ico:'🤖'},
 ];
+// Short prompts shown in left chat panel
 const SUGGS=[
-  {t:'Engineering blog posts from the last 90 days where the author describes MIGRATING from one AI framework or orchestration approach to another — switching from LangChain to custom, moving from single-model to multi-agent, replacing a vendor, or rebuilding an internal tool',tag:'🔀 Migration · AI Framework'},
-  {t:'News coverage or blog posts where companies describe deploying AI agents in REGULATED industries — healthcare, financial services, insurance, legal, government — specifically mentioning compliance, audit trails, explainability, or regulatory requirements',tag:'🏛️ Regulated · AI Compliance'},
-  {t:'News articles about companies that ACQUIRED an AI startup or acqui-hired an AI team in the last 6 months — specifically where the acquisition was described as bringing AI capabilities in-house',tag:'🤝 M&A · AI Acqui-hire'},
-  {t:'Blog posts, published talks, or articles where CISOs or security leaders describe the challenges of securing AI systems, LLM deployments, or agent-based workflows — specifically the gaps in their existing security stack',tag:'🔒 CISO · AI Security Gaps'},
-  {t:'Companies that appear across MULTIPLE security signal types — mentioned in AI breach news OR publishing about AI security challenges AND operating in a regulated industry AND having recently announced AI product deployments — stacked security signals within a 90-day window',tag:'⚠️ Stacked · Security Signals'}
+  {t:'Has ramp.com published an engineering blog post in the last 90 days about platform engineering or internal developer tools?',tag:'📝 Blog · Engineering'},
+  {t:'Has cloudflare.com disclosed a security breach, incident, or CVE affecting their products in the last 12 months?',tag:'🔒 Security · CVE'},
+  {t:'List all press releases from stripe.com in the last 60 days — tag each as funding, product, partnership, or customer win.',tag:'📣 Press · Announcements'},
+  {t:'Has linear.app announced a new product, MCP launch, or major feature release in the last 60 days?',tag:'🚀 Product · Launch'},
+  {t:'Find any blog post or press release where Okta names or compares itself to Microsoft Entra, Ping Identity, or SailPoint.',tag:'🎯 Competitor · Intel'},
+];
+
+// 7-theme capability data for the right-panel explorer
+const CAP_DATA=[
+  {
+    id:'blog', ico:'📝', name:'Company Blog Posts',
+    desc:'Engineering posts, growth teardowns, migration stories',
+    prompt:'Has ramp.com published an engineering blog post in the last 90 days about platform engineering, developer productivity, internal developer platforms, or build/deploy infrastructure? Return post title, date, and author if yes.',
+    tag:'Blog · Engineering'
+  },
+  {
+    id:'security', ico:'🔒', name:'Security Breaches & CVEs',
+    desc:'Post-mortems, vulnerability disclosures, CVSS reports',
+    prompt:'Has cloudflare.com disclosed a security breach, incident, or CVE affecting their products in the last 12 months? Include CVE ID, CVSS score, and affected product if available.',
+    tag:'Security · CVE'
+  },
+  {
+    id:'press', ico:'📣', name:'Press Announcements',
+    desc:'Funding rounds, partnerships, executive hires',
+    prompt:'List all press releases from google.com in the last 60 days. Tag each as: funding, M&A, product, partnership, customer win, or exec hire.',
+    tag:'Press · Announcements'
+  },
+  {
+    id:'product', ico:'🚀', name:'Product Launches & Changelogs',
+    desc:'New features, deprecations, API changes, release notes',
+    prompt:'Has sumble.com announced a new product, MCP launch, or major feature release in the last 60 days? Return the announcement title, date, and a one-line summary.',
+    tag:'Product · Launch'
+  },
+  {
+    id:'case', ico:'📖', name:'Case Studies',
+    desc:'How companies solved problems, platform migrations',
+    prompt:'Has cortex.io been featured as a named customer in any competitor or adjacent vendor\'s case study in the last 12 months? Return the vendor name, case study title, and URL.',
+    tag:'Case Studies · Mentions'
+  },
+  {
+    id:'research', ico:'📊', name:'Whitepapers & Research',
+    desc:'Architecture papers, benchmark reports, developer guides',
+    prompt:'Has purestorage.com published a whitepaper, research report, or been cited by name in a Gartner/Forrester/IDC report adjacent to my category in the last 12 months?',
+    tag:'Research · Whitepapers'
+  },
+  {
+    id:'competitor', ico:'🎯', name:'Competitor Intelligence',
+    desc:'What rivals are building, announcing, or claiming',
+    prompt:'Find any Okta 10-K Competition section, blog post, or press release where Okta names or compares itself to Microsoft Entra, Ping Identity, SailPoint, or CyberArk.',
+    tag:'Competitor · Intel'
+  },
 ];
 const MOCK={total_companies:14,companies:[
   {company_name:'Vitally',company_domain:'vitally.io',evidence:[{company_name:'Vitally',company_domain:'vitally.io',news_source_domain:'vitally.io',url:'https://vitally.io/blog/reducing-churn',title:'Reducing Churn at Scale',content_type:'blog post',key_excerpt:'Proactive churn playbooks within 30 days → 34% better net retention.',confidence:.92,date:'2026-03-18'},{company_name:'Vitally',company_domain:'vitally.io',news_source_domain:'vitally.io',url:'https://vitally.io/blog/onboarding-friction',title:'We Audited Our Onboarding',content_type:'blog post',key_excerpt:'Median TTV was 23 days, cut to 9. Onboarding friction was #1 churn driver.',confidence:.88,date:'2026-02-05'}]},
@@ -498,11 +579,68 @@ function togHist(){document.getElementById('hp').classList.toggle('open');docume
 function filtH(v){renH(v)}
 function loadH(id){const h=HIST.find(x=>x.id===id);if(h){togHist();runQ(h.q)}}
 
-function openAgent(){resetA();document.getElementById('afs').classList.add('open');setTimeout(()=>document.getElementById('inp').focus(),80)}
+function openAgent(){resetA();renderCapExplorer();document.getElementById('afs').classList.add('open');setTimeout(()=>document.getElementById('inp').focus(),80)}
 function closeAgent(){document.getElementById('afs').classList.remove('open')}
 function sps(n,b){ps=n;document.querySelectorAll('.pg-p').forEach(x=>x.classList.toggle('active',x===b));renT(aR)}
 function resetA(){run=false;fD=[];aR=[];ps=10;exG=new Set();_layout='default';const m=document.getElementById('msgs');[...m.children].forEach(c=>{if(c.id!=='intro')c.remove()});document.getElementById('suggs').style.display='';document.getElementById('empty').style.display='flex';document.getElementById('pip').style.display='none';document.getElementById('resH').style.display='none';document.getElementById('tsc').style.display='none';document.getElementById('san').style.display='none';document.getElementById('dlBtn').disabled=true;document.getElementById('elap').style.display='none';document.getElementById('inp').value='';document.getElementById('tb').innerHTML='';['query','search','scrape','extract','score'].forEach(rPh);renS()}
 function renS(){const l=document.getElementById('suggL');l.innerHTML='';SUGGS.forEach(s=>{const e=document.createElement('div');e.className='fsg-i';e.onclick=()=>{e.classList.add('used');runQ(s.t)};const p=s.t.length>130?s.t.slice(0,127)+'…':s.t;e.innerHTML=`<div class="fsg-arr">→</div><div style="min-width:0"><div class="fsg-txt">${esc(p)}</div><div class="fsg-tag">${esc(s.tag)}</div></div>`;l.appendChild(e)})}
+
+// ── Capability Explorer ───────────────────────────────────────────────────────
+let _capFilter = 'all';
+
+function renderCapExplorer() {
+  // Render category filter tabs
+  const tabs = document.getElementById('capTabs');
+  if (tabs && !tabs.hasChildNodes()) {
+    const cats = [{id:'all',label:'All'},{id:'blog',label:'📝 Blog'},{id:'security',label:'🔒 Security'},{id:'press',label:'📣 Press'},{id:'product',label:'🚀 Product'},{id:'case',label:'📖 Case Studies'},{id:'research',label:'📊 Research'},{id:'competitor',label:'🎯 Competitor'}];
+    cats.forEach(c => {
+      const b = document.createElement('button');
+      b.className = 'cap-tab' + (c.id === _capFilter ? ' active' : '');
+      b.textContent = c.label;
+      b.onclick = () => filterCap(c.id);
+      tabs.appendChild(b);
+    });
+  }
+  renderCapCards();
+}
+
+function filterCap(cat) {
+  _capFilter = cat;
+  document.querySelectorAll('.cap-tab').forEach(t => {
+    const label = t.textContent.replace(/^[^\s]+\s/,'').toLowerCase();
+    const id = cat === 'all' ? 'all' : cat;
+    t.classList.toggle('active',
+      (cat === 'all' && t.textContent === 'All') ||
+      t === [...document.querySelectorAll('.cap-tab')].find(x => x.textContent.trim().split(' ').pop().toLowerCase().startsWith(cat.slice(0,4)))
+    );
+  });
+  // Re-sync tabs by rebuilding
+  const tabs = document.getElementById('capTabs');
+  if (tabs) [...tabs.children].forEach(b => b.classList.toggle('active', (cat==='all'&&b.textContent==='All')||b.textContent.toLowerCase().includes(cat.slice(0,5))));
+  renderCapCards();
+}
+
+function renderCapCards() {
+  const grid = document.getElementById('capGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const items = _capFilter === 'all' ? CAP_DATA : CAP_DATA.filter(c => c.id === _capFilter);
+  items.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'cap-card';
+    const short = c.prompt.length > 160 ? c.prompt.slice(0,157) + '…' : c.prompt;
+    card.innerHTML = `
+      <div class="cap-card-hdr">
+        <span class="cap-ico">${c.ico}</span>
+        <div><div class="cap-name">${esc(c.name)}</div><div class="cap-desc">${esc(c.desc)}</div></div>
+      </div>
+      <div class="cap-prompt" title="Click to run this prompt" onclick="runQ(${JSON.stringify(c.prompt)})">
+        <span class="cap-prompt-arr">→</span>
+        <span class="cap-prompt-txt">${esc(short)}</span>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
 function addU(t){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fm fm-u';d.innerHTML=`<div class="fb fb-u">${esc(t)}</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
 function addA(h){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fm fm-a';d.innerHTML=`<div class="fav"><svg viewBox="0 0 20 20" class="rob" style="width:14px;height:14px"><rect x="4" y="6" width="12" height="9" rx="2"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="12.5" cy="10" r="1.5"/><rect x="8" y="12" width="4" height="1.5" rx=".5"/><rect x="9" y="3" width="2" height="3" rx="1"/></svg></div><div class="fb fb-a">${h}</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
 function addTh(id){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fth';d.id=id;d.innerHTML=`<div class="fth-d"><span></span><span></span><span></span></div><div class="fth-t">Searching the web…</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
