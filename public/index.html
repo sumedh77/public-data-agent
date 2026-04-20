@@ -104,14 +104,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
 .fb{max-width:520px;border-radius:var(--rl);padding:12px 16px;font-size:13px;line-height:1.65}
 .fb-a{background:var(--bg);border-radius:4px 14px 14px 14px}.fb-u{background:var(--pri);border-radius:14px 4px 14px 14px;color:#fff;max-width:400px}
 .fan{font-family:var(--mono);font-size:9px;color:var(--pri);letter-spacing:.04em;margin-bottom:5px;text-transform:uppercase;font-weight:500}
-.fsg{padding-left:40px;max-width:580px;margin-top:8px}
+.fsg{padding-left:40px;max-width:640px;margin-top:8px}
 .fsg-l{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--tm);margin-bottom:10px;font-weight:600}
-.fsg-ls{display:flex;flex-direction:column;gap:7px}
-.fsg-i{border:1.5px solid var(--border);border-left:3px solid var(--pri);border-radius:var(--r);padding:11px 14px;cursor:pointer;background:var(--white);transition:all .15s;display:flex;gap:10px;align-items:flex-start}
-.fsg-i:hover{border-color:var(--prb);border-left-color:var(--prd);background:var(--prl);box-shadow:0 2px 8px rgba(99,102,241,.12);transform:translateX(2px)}.fsg-i.used{opacity:.35;pointer-events:none}
-.fsg-arr{font-size:12px;color:var(--pri);flex-shrink:0;margin-top:1px;font-weight:700}
-.fsg-txt{font-size:12px;color:var(--text);line-height:1.45;font-weight:500}
-.fsg-tag{font-family:var(--mono);font-size:9.5px;color:var(--pri);background:var(--prl);border:1px solid var(--prb);border-radius:4px;padding:1px 6px;margin-top:5px;display:inline-block;font-weight:600}
+.fsg-ls{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fsg-i{border:1.5px solid var(--border);border-radius:var(--r);padding:11px 14px;cursor:pointer;background:var(--white);transition:all .15s;display:flex;flex-direction:column;gap:6px}
+.fsg-i:hover{border-color:var(--prb);background:var(--prl);box-shadow:0 2px 8px rgba(99,102,241,.12);transform:translateY(-1px)}.fsg-i.used{opacity:.35;pointer-events:none}
+.fsg-arr{display:none}
+.fsg-tag{font-family:var(--mono);font-size:9.5px;color:var(--pri);background:var(--prl);border:1px solid var(--prb);border-radius:4px;padding:2px 7px;display:inline-block;font-weight:700}
+.fsg-txt{font-size:11.5px;color:var(--tm);line-height:1.45;font-weight:400}
 .fth{display:flex;align-items:center;gap:8px;padding-left:40px}
 .fth-d{display:flex;gap:4px}
 .fth-d span{width:6px;height:6px;border-radius:50%;background:#818cf8;animation:tdp 1.4s ease-in-out infinite}
@@ -339,31 +339,23 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
     </div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
       <div class="cs"><div class="ch"><span>👥</span><span class="ct">Engineering Team Investments</span></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div class="ac"><div class="rav"><svg viewBox="0 0 20 20" class="rob"><rect x="4" y="6" width="12" height="9" rx="2"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="12.5" cy="10" r="1.5"/><rect x="8" y="12" width="4" height="1.5" rx=".5"/><rect x="9" y="3" width="2" height="3" rx="1"/></svg></div><div class="cn">Headcount Fit</div><div class="cd">Engineering team size matching your ICP.</div><div class="cf"><span class="ctg">Category</span><button class="cbtn">Chat & configure →</button></div></div><div class="ac"><div class="rav"><svg viewBox="0 0 20 20" class="rob"><rect x="4" y="6" width="12" height="9" rx="2"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="12.5" cy="10" r="1.5"/><rect x="8" y="12" width="4" height="1.5" rx=".5"/><rect x="9" y="3" width="2" height="3" rx="1"/></svg></div><div class="cn">Team Growing</div><div class="cd">Teams growing or shrinking by technology.</div><div class="cf"><span class="ctg">Category</span><button class="cbtn">Chat & configure →</button></div></div></div></div>
-      <div class="cs"><div class="ch"><span>🔍</span><span class="ct">Open Signal Agent</span></div><div class="ac cust" onclick="openAgent()"><div class="rav g"><svg viewBox="0 0 20 20" class="rob"><rect x="4" y="6" width="12" height="9" rx="2"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="12.5" cy="10" r="1.5"/><rect x="8" y="12" width="4" height="1.5" rx=".5"/><rect x="9" y="3" width="2" height="3" rx="1"/></svg></div><div class="cn">Public data exploration</div><div class="cd">Crawl news, tech blogs, filings to surface buying intent signals.</div><div class="cf"><span class="ctg">Category</span><button class="cbtn">Chat & configure →</button></div></div></div>
-    </div>
-
-    <!-- Web Intelligence section -->
-    <div class="cs" style="margin-top:24px">
-      <div class="ch"><span>🌐</span><span class="ct">Web Intelligence</span></div>
-      <div class="ag" style="grid-template-columns:repeat(2,1fr)">
-        <!-- Scrape Website -->
-        <div class="ac" onclick="openWebTool('scrape')">
-          <div class="rav" style="background:linear-gradient(135deg,#0ea5e9,#38bdf8)">
-            <svg viewBox="0 0 20 20" class="rob"><path d="M3 5h14M3 10h14M3 15h8" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="16" cy="15" r="3" fill="#fff" opacity=".9"/><path d="M15 15h2M16 14v2" stroke="#0ea5e9" stroke-width="1" stroke-linecap="round"/></svg>
+      <div class="cs"><div class="ch"><span>🔍</span><span class="ct">Open Signal Agent</span></div>
+        <div class="ac cust" onclick="openAgent()"><div class="rav g"><svg viewBox="0 0 20 20" class="rob"><rect x="4" y="6" width="12" height="9" rx="2"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="12.5" cy="10" r="1.5"/><rect x="8" y="12" width="4" height="1.5" rx=".5"/><rect x="9" y="3" width="2" height="3" rx="1"/></svg></div><div class="cn">Open Signal Agent</div><div class="cd">Crawl news, tech blogs, filings to surface buying intent signals.</div><div class="cf"><span class="ctg">Category</span><button class="cbtn">Chat & configure →</button></div></div>
+        <div style="margin-top:12px"><div class="ch" style="margin-bottom:10px"><span>🌐</span><span class="ct" style="font-size:11px">Web Intelligence</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="ac" onclick="openWebTool('scrape')">
+            <div class="rav" style="background:linear-gradient(135deg,#0ea5e9,#38bdf8)"><svg viewBox="0 0 20 20" class="rob"><path d="M3 5h14M3 10h14M3 15h8" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="16" cy="15" r="3" fill="#fff" opacity=".9"/><path d="M15 15h2M16 14v2" stroke="#0ea5e9" stroke-width="1" stroke-linecap="round"/></svg></div>
+            <div class="cn">Scrape Website</div>
+            <div class="cd">Extract clean content from any URL — text, metadata, and structure. Powered by Firecrawl.</div>
+            <div class="cf"><span class="ctg">Web Tools</span><button class="cbtn">Open tool →</button></div>
           </div>
-          <div class="cn">Scrape Website</div>
-          <div class="cd">Extract clean content from any URL — text, metadata, and structure. Powered by Firecrawl.</div>
-          <div class="cf"><span class="ctg">Web Tools</span><button class="cbtn">Open tool →</button></div>
-        </div>
-        <!-- Find GitHub -->
-        <div class="ac" onclick="openWebTool('github')">
-          <div class="rav" style="background:linear-gradient(135deg,#1e293b,#475569)">
-            <svg viewBox="0 0 20 20" class="rob"><path fill="#fff" d="M10 2C5.58 2 2 5.58 2 10c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0018 10c0-4.42-3.58-8-8-8z"/></svg>
+          <div class="ac" onclick="openWebTool('github')">
+            <div class="rav" style="background:linear-gradient(135deg,#1e293b,#475569)"><svg viewBox="0 0 20 20" class="rob"><path fill="#fff" d="M10 2C5.58 2 2 5.58 2 10c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0018 10c0-4.42-3.58-8-8-8z"/></svg></div>
+            <div class="cn">Find GitHub</div>
+            <div class="cd">Detect GitHub presence on any company website — surface repos, orgs, and open-source activity.</div>
+            <div class="cf"><span class="ctg">Web Tools</span><button class="cbtn">Open tool →</button></div>
           </div>
-          <div class="cn">Find GitHub</div>
-          <div class="cd">Detect GitHub presence on any company website — surface repos, orgs, and open-source activity.</div>
-          <div class="cf"><span class="ctg">Web Tools</span><button class="cbtn">Open tool →</button></div>
-        </div>
+        </div></div>
       </div>
     </div>
 
@@ -517,7 +509,7 @@ function openAgent(){resetA();document.getElementById('afs').classList.add('open
 function closeAgent(){document.getElementById('afs').classList.remove('open')}
 function sps(n,b){ps=n;document.querySelectorAll('.pg-p').forEach(x=>x.classList.toggle('active',x===b));renT(aR)}
 function resetA(){run=false;fD=[];aR=[];ps=10;exG=new Set();const m=document.getElementById('msgs');[...m.children].forEach(c=>{if(c.id!=='intro')c.remove()});document.getElementById('suggs').style.display='';document.getElementById('empty').style.display='flex';document.getElementById('pip').style.display='none';document.getElementById('resH').style.display='none';document.getElementById('tsc').style.display='none';document.getElementById('san').style.display='none';document.getElementById('dlBtn').disabled=true;document.getElementById('elap').style.display='none';document.getElementById('inp').value='';document.getElementById('tb').innerHTML='';['query','search','scrape','extract','score'].forEach(rPh);renS()}
-function renS(){const l=document.getElementById('suggL');l.innerHTML='';SUGGS.forEach(s=>{const e=document.createElement('div');e.className='fsg-i';e.onclick=()=>{e.classList.add('used');runQ(s.t)};const p=s.t.length>130?s.t.slice(0,127)+'…':s.t;e.innerHTML=`<div class="fsg-arr">→</div><div style="min-width:0"><div class="fsg-txt">${esc(p)}</div><div class="fsg-tag">${esc(s.tag)}</div></div>`;l.appendChild(e)})}
+function renS(){const l=document.getElementById('suggL');l.innerHTML='';SUGGS.forEach(s=>{const e=document.createElement('div');e.className='fsg-i';e.onclick=()=>{e.classList.add('used');runQ(s.t)};const p=s.t.length>90?s.t.slice(0,87)+'…':s.t;e.innerHTML=`<div class="fsg-tag">${esc(s.tag)}</div><div class="fsg-txt">${esc(p)}</div>`;l.appendChild(e)})}
 function addU(t){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fm fm-u';d.innerHTML=`<div class="fb fb-u">${esc(t)}</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
 function addA(h){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fm fm-a';d.innerHTML=`<div class="fav"><svg viewBox="0 0 20 20" class="rob" style="width:14px;height:14px"><rect x="4" y="6" width="12" height="9" rx="2"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="12.5" cy="10" r="1.5"/><rect x="8" y="12" width="4" height="1.5" rx=".5"/><rect x="9" y="3" width="2" height="3" rx="1"/></svg></div><div class="fb fb-a">${h}</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
 function addTh(id){const m=document.getElementById('msgs'),d=document.createElement('div');d.className='fth';d.id=id;d.innerHTML=`<div class="fth-d"><span></span><span></span><span></span></div><div class="fth-t">Searching the web…</div>`;m.appendChild(d);m.scrollTop=m.scrollHeight}
